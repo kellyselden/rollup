@@ -1,10 +1,168 @@
-import { keys } from '../utils/object';
+import { blank, keys, values } from '../utils/object';
 import { Bundle as MagicStringBundle } from 'magic-string';
 import Bundle from '../Bundle';
+import ExternalModule from '../ExternalModule';
+import Module from '../Module';
 import ExternalVariable, { isExternalVariable } from '../ast/variables/ExternalVariable';
+import ImportDeclaration from '../ast/nodes/ImportDeclaration';
+import NamespaceVariable from '../ast/variables/NamespaceVariable';
+import ImportNamedDeclaration from '../ast/nodes/ImportNamedDeclaration';
+import ImportSpecifier from '../ast/nodes/ImportSpecifier';
+import ImportDefaultSpecifier from '../ast/nodes/ImportDefaultSpecifier';
+import ImportNamespaceSpecifier from '../ast/nodes/ImportNamespaceSpecifier';
 
 function notDefault (name: string) {
 	return name !== 'default';
+}
+
+export function createSpecifierString (imported: string, local: string) {
+	if (local !== imported) {
+		return `${imported} as ${local}`;
+	} else {
+		return imported;
+	}
+}
+
+export function createSources (externalModule: Module | ExternalModule, node: ImportDeclaration) {
+	function resolveId (value: string) {
+		return node.module.resolvedIds[value] || node.module.resolvedExternalIds[value];
+	}
+
+	const sources = blank();
+	if (externalModule.isExternal && !node) {
+		keys(externalModule.declarations).forEach(key => {
+			const declaration = externalModule.declarations[key];
+			// if (!node && !module.imports[key]) {
+			// 	return;
+			// }
+
+			sources[declaration.name] = {
+				included: declaration.included,
+				// name: declaration.name,
+				// safeName: declaration.safeName
+				imported: declaration.name,
+				local: declaration instanceof ExternalVariable ? declaration.safeName : null
+			};
+		});
+	}
+	if (node) {
+		const { module } = node;
+
+		const namespacedVariables = values(module.scope.namespacedVariables).filter(variable => {
+			return (variable instanceof NamespaceVariable || variable instanceof ExternalVariable) && variable.module === externalModule;
+		});
+		namespacedVariables.forEach(variable => {
+			sources[variable.name] = {
+				included: true,
+				imported: variable.name,
+				local: variable instanceof ExternalVariable ? variable.safeName : null
+			};
+		});
+
+		const id = resolveId(node.source.value.toString());
+		const importNodes = (<(ImportDeclaration | ImportNamedDeclaration)[]>module.ast.body.filter(n => {
+			return n instanceof ImportDeclaration || n instanceof ImportNamedDeclaration;
+		})).filter(n => {
+			if (n instanceof ImportDeclaration || n instanceof ImportNamedDeclaration) {
+				const _id = resolveId(n.source.value.toString());
+				return _id === id;
+			}
+		});
+		const specifiers = importNodes.reduce((specifiers, node) => {
+			(node.specifiers as (ImportSpecifier | ImportDefaultSpecifier | ImportNamespaceSpecifier)[]).forEach(specifier => {
+				let name;
+				if (specifier.type === 'ImportDefaultSpecifier') {
+					name = 'default';
+				} else if (specifier.type === 'ImportSpecifier') {
+					name = specifier.local.name;
+				} else if (specifier.type === 'ImportNamespaceSpecifier') {
+					name = '*';
+				}
+				if (name) {
+					specifiers[name] = specifier;
+				}
+			});
+			return specifiers;
+		}, blank());
+		keys(specifiers).forEach(key => {
+			const specifier = specifiers[key];
+			if (specifier) {
+				sources[key] = {
+					included: specifier.included,
+					imported: specifier.imported ? specifier.imported.name : specifier.local.name,
+					local: specifier.local.name
+				};
+			}
+		});
+	}
+	return sources;
+}
+
+export function createExternalImportString (externalModule: Module | ExternalModule, { getPath, node }: {
+	getPath: (name: string) => string;
+	node: ImportDeclaration;
+}) {
+	const sources = createSources(externalModule, node);
+	const specifiers: string[] = [];
+	const specifiersList = [specifiers];
+	const importedNames = keys(sources)
+		.filter(name => name !== '*' && name !== 'default')
+		.filter(name => sources[name].included)
+		.map(name => {
+			if (name[0] === '*' && externalModule instanceof ExternalModule) {
+				return `* as ${externalModule.name}`;
+			}
+
+			const source = sources[name];
+
+			return createSpecifierString(source.imported, source.local);
+		})
+		.filter(Boolean);
+
+	if (sources.default) {
+		if (externalModule instanceof ExternalModule) {
+			const name = externalModule.name || sources.default.local;
+			if (externalModule.exportsNamespace && !node) {
+				specifiersList.push([`${name}__default`]);
+			} else {
+				specifiers.push(name);
+			}
+		} else {
+			specifiers.push(sources.default.local);
+		}
+	}
+
+	const namespaceSpecifier =
+		sources['*'] && sources['*'].included
+			? `* as ${externalModule instanceof ExternalModule ? externalModule.name : sources['*'].local}` : null; // TODO prevent unnecessary namespace import, e.g form/external-imports
+	const namedSpecifier = importedNames.length
+		? `{ ${importedNames.sort().join(', ')} }`
+		: null;
+
+	if (namespaceSpecifier && namedSpecifier) {
+		// Namespace and named specifiers cannot be combined.
+		specifiersList.push([namespaceSpecifier]);
+		specifiers.push(namedSpecifier);
+	} else if (namedSpecifier) {
+		specifiers.push(namedSpecifier);
+	} else if (namespaceSpecifier) {
+		specifiers.push(namespaceSpecifier);
+	}
+
+	const id = node && typeof node.source.value === 'string' ? node.source.value : externalModule.id;
+
+	return specifiersList
+		.map(specifiers => {
+			if (specifiers.length) {
+				return `import ${specifiers.join(', ')} from '${getPath(
+					id
+				)}';`;
+			}
+
+			return externalModule instanceof ExternalModule && externalModule.reexported ? null : `import '${getPath(id)}';`;
+		})
+		.filter(Boolean)
+		.join('\n');
 }
 
 export default function es (bundle: Bundle, magicString: MagicStringBundle, { getPath, intro, outro }: {
@@ -16,62 +174,7 @@ export default function es (bundle: Bundle, magicString: MagicStringBundle, { ge
 }) {
 	const importBlock = bundle.externalModules
 		.map(module => {
-			const specifiers: string[] = [];
-			const specifiersList = [specifiers];
-			const importedNames = keys(module.declarations)
-				.filter(name => name !== '*' && name !== 'default')
-				.filter(name => module.declarations[name].included)
-				.map(name => {
-					if (name[0] === '*') {
-						return `* as ${module.name}`;
-					}
-
-					const declaration = <ExternalVariable> module.declarations[name];
-
-					if (declaration.name === declaration.safeName)
-						return declaration.name;
-					return `${declaration.name} as ${declaration.safeName}`;
-				})
-				.filter(Boolean);
-
-			if (module.declarations.default) {
-				if (module.exportsNamespace) {
-					specifiersList.push([`${module.name}__default`]);
-				} else {
-					specifiers.push(module.name);
-				}
-			}
-
-			const namespaceSpecifier =
-				module.declarations['*'] && module.declarations['*'].included
-					? `* as ${module.name}`
-					: null; // TODO prevent unnecessary namespace import, e.g form/external-imports
-			const namedSpecifier = importedNames.length
-				? `{ ${importedNames.sort().join(', ')} }`
-				: null;
-
-			if (namespaceSpecifier && namedSpecifier) {
-				// Namespace and named specifiers cannot be combined.
-				specifiersList.push([namespaceSpecifier]);
-				specifiers.push(namedSpecifier);
-			} else if (namedSpecifier) {
-				specifiers.push(namedSpecifier);
-			} else if (namespaceSpecifier) {
-				specifiers.push(namespaceSpecifier);
-			}
-
-			return specifiersList
-				.map(specifiers => {
-					if (specifiers.length) {
-						return `import ${specifiers.join(', ')} from '${getPath(
-							module.id
-						)}';`;
-					}
-
-					return module.reexported ? null : `import '${getPath(module.id)}';`;
-				})
-				.filter(Boolean)
-				.join('\n');
+			return createExternalImportString(module, { getPath, node: null });
 		})
 		.join('\n');
 

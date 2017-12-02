@@ -1,6 +1,6 @@
 import { timeStart, timeEnd, flushTime } from '../utils/flushTime';
-import { basename } from '../utils/path';
-import { writeFile } from '../utils/fs';
+import { basename, join, dirname } from '../utils/path';
+import { writeFile, mkdirp } from '../utils/fs';
 import { assign, keys } from '../utils/object';
 import { mapSequence } from '../utils/promise';
 import error from '../utils/error';
@@ -13,6 +13,7 @@ import { SourceMap } from 'magic-string';
 import { WatcherOptions } from '../watch/index';
 import { Deprecation } from '../utils/deprecateOptions';
 import Graph from '../Graph';
+import Bundle from '../Bundle';
 
 export const VERSION = '<@VERSION@>';
 
@@ -67,6 +68,9 @@ export interface InputOptions {
 	legacy?: boolean;
 	watch?: WatcherOptions;
 	experimentalDynamicImport?: boolean;
+	preserveSymlinks?: boolean;
+	includeMissingExports?: boolean;
+	includeAllNamespacedInternal?: boolean;
 
 	// undocumented?
 	pureExternalModules?: boolean;
@@ -91,6 +95,9 @@ export interface OutputOptions {
 	name?: string;
 	globals?: GlobalsOption;
 
+	srcDir?: string;
+	destDir?: string;
+
 	paths?: Record<string, string> | ((id: string) => string);
 	banner?: string;
 	footer?: string;
@@ -109,6 +116,7 @@ export interface OutputOptions {
 	indent?: boolean;
 	strict?: boolean;
 	freeze?: boolean;
+	preserveModules?: boolean;
 
 	// shared?
 	legacy?: boolean;
@@ -119,6 +127,12 @@ export interface OutputOptions {
 	// deprecated
 	dest?: string;
 	moduleId?: string;
+}
+
+export interface RenderOptions {
+	preserveModules?: boolean;
+	getPath?: (name: string) => string;
+	bundle?: Bundle;
 }
 
 export interface RollupWarning {
@@ -176,7 +190,7 @@ function checkOutputOptions (options: OutputOptions) {
 		});
 	}
 
-	if (!options.format) {
+	if (!options.format && !options.preserveModules) {
 		error({
 			message: `You must specify options.format, which can be one of 'amd', 'cjs', 'es', 'iife' or 'umd'`,
 			url: `https://rollupjs.org/#format-f-output-format-`
@@ -201,7 +215,10 @@ export interface OutputBundle {
 	exports: string[];
 	modules: ModuleJSON[];
 
+	bundle: Bundle, // TEMPORARY ember-cli hack
+
 	generate: (outputOptions: OutputOptions) => Promise<{ code: string, map: SourceMap }>;
+	generateModules: (outputOptions: OutputOptions) => Promise<{ file: string; code: string; }[]>;
 	write: (options: OutputOptions) => Promise<void>;
 }
 
@@ -227,7 +244,7 @@ export default function rollup (rawInputOptions: GenericConfigObject) {
 			.then((bundle) => {
 				timeEnd('--BUILD--');
 
-				function generate (rawOutputOptions: GenericConfigObject) {
+				function normalizeOptions (rawOutputOptions: GenericConfigObject) {
 					if (!rawOutputOptions) {
 						throw new Error('You must supply an options object');
 					}
@@ -251,6 +268,12 @@ export default function rollup (rawInputOptions: GenericConfigObject) {
 
 					if (deprecations.length) addDeprecations(deprecations, inputOptions.onwarn);
 					checkOutputOptions(outputOptions);
+
+					return outputOptions;
+				}
+
+				function generate (rawOutputOptions: GenericConfigObject) {
+					const outputOptions = normalizeOptions(rawOutputOptions);
 
 					timeStart('--GENERATE--');
 
@@ -284,17 +307,41 @@ export default function rollup (rawInputOptions: GenericConfigObject) {
 					return promise;
 				}
 
+				function generateModules (rawOutputOptions: GenericConfigObject) {
+					const outputOptions = normalizeOptions(rawOutputOptions);
+
+					return bundle.renderModules(outputOptions);
+				}
+
 				const result: OutputBundle = {
 					imports: bundle.externalModules.map(module => module.id),
 					exports: keys(bundle.entryModule.exports),
 					modules: bundle.orderedModules.map(module => module.toJSON()),
 
+					bundle, // TEMPORARY ember-cli hack
+
 					generate,
+					generateModules,
 					write: (outputOptions: OutputOptions) => {
-						if (!outputOptions || (!outputOptions.file && !outputOptions.dest)) {
+						if (!outputOptions || (!outputOptions.file && !outputOptions.dest && !outputOptions.destDir)) {
 							error({
 								code: 'MISSING_OPTION',
 								message: 'You must specify output.file'
+							});
+						}
+
+						if (outputOptions.preserveModules) {
+							return generateModules(outputOptions).then(files => {
+								const promises = files.map(({ file, code }) => {
+									const newFile = join(outputOptions.destDir, file);
+									return mkdirp(dirname(newFile)).then(() => {
+										return writeFile(newFile, `${code}\n`);
+									});
+								});
+
+								return Promise.all(promises)
+									// ensures return isn't void[]
+									.then(() => { });
 							});
 						}
 

@@ -28,6 +28,7 @@ import Program from './ast/nodes/Program';
 import { Node } from './ast/nodes/shared/Node';
 import Bundle from './Bundle';
 import ExportDefaultVariable from './ast/variables/ExportDefaultVariable';
+import ExportNamedDeclaration from './ast/nodes/ExportNamedDeclaration';
 
 export type ResolveDynamicImportHandler = (specifier: string | Node, parentId: string) => Promise<string | void>;
 
@@ -39,6 +40,8 @@ export default class Graph {
 	externalModules: ExternalModule[];
 	getModuleContext: (id: string) => string;
 	hasLoaders: boolean;
+	includeAllNamespacedInternal: boolean;
+	includeMissingExports: boolean;
 	isExternal: IsExternalHook;
 	isPureExternalModule: (id: string) => boolean;
 	legacy: boolean;
@@ -47,6 +50,7 @@ export default class Graph {
 	modules: Module[];
 	onwarn: WarningHandler;
 	plugins: Plugin[];
+	preserveSymlinks: boolean;
 	resolveDynamicImport: ResolveDynamicImportHandler;
 	resolveId: (id: string, parent: string) => Promise<string | boolean | void>;
 	scope: GlobalScope;
@@ -160,6 +164,10 @@ export default class Graph {
 			this.acornOptions.plugins = this.acornOptions.plugins || {};
 			this.acornOptions.plugins.dynamicImport = true;
 		}
+
+		this.preserveSymlinks = options.preserveSymlinks;
+		this.includeMissingExports = options.includeMissingExports;
+		this.includeAllNamespacedInternal = options.includeAllNamespacedInternal;
 	}
 
 	private loadModule (entryName: string) {
@@ -308,6 +316,11 @@ export default class Graph {
 		entryModule.getExports().forEach(name => {
 			const variable = entryModule.traceExport(name);
 
+			const y = entryModule.exports[name];
+			if (y && y.specifier) {
+				y.specifier.includeInBundle();
+			}
+
 			variable.exportName = name;
 			variable.includeVariable();
 
@@ -319,11 +332,40 @@ export default class Graph {
 		entryModule.getReexports().forEach(name => {
 			const variable = entryModule.traceExport(name);
 
-			if (isExternalVariable(variable)) {
-				variable.reexported = variable.module.reexported = true;
-			} else {
-				variable.exportName = name;
-				variable.includeVariable();
+			const y = entryModule.reexports[name];
+			if (y && !y.module.isExternal) {
+				y.module.ast.body.forEach(node => {
+					if (node instanceof ExportNamedDeclaration) {
+						node.specifiers.forEach(specifier => {
+							if (specifier.exported.name === y.localName) {
+								specifier.includeInBundle();
+							}
+						});
+					} else if (y.localName === 'default' && node.type === 'ExportDefaultDeclaration') {
+						node.includeInBundle();
+					}
+				});
+			}
+			if (y && y.specifier) {
+				y.specifier.includeInBundle();
+			}
+
+			if (variable) {
+				if (isExternalVariable(variable)) {
+					variable.reexported = variable.module.reexported = true;
+				} else {
+					variable.exportName = name;
+					variable.includeVariable();
+				}
+			}
+		});
+
+		entryModule.ast.body.forEach(node => {
+			if (node.type === 'ExportAllDeclaration') {
+				// let x = this.entryModule.resolvedIds[node.source.value];
+				// if (this.entryModule.resolvedExternalIds[node.source.value]) {
+				node.includeInBundle();
+				// }
 			}
 		});
 

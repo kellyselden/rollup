@@ -1,7 +1,6 @@
 import ensureArray from './ensureArray.js';
-import deprecateOptions from './deprecateOptions.js';
+import deprecateOptions, { Deprecation } from './deprecateOptions';
 import { InputOptions, WarningHandler, OutputOptions } from '../../src/rollup/index';
-import { Deprecation } from './deprecateOptions';
 
 function normalizeObjectOptionValue (optionValue: any) {
 	if (!optionValue) {
@@ -74,6 +73,9 @@ export default function mergeOptions ({
 		cache: getInputOption('cache'),
 		preferConst: getInputOption('preferConst'),
 		experimentalDynamicImport: getInputOption('experimentalDynamicImport'),
+		preserveSymlinks: config.preserveSymlinks,
+		includeMissingExports: config.includeMissingExports,
+		includeAllNamespacedInternal: config.includeAllNamespacedInternal,
 	};
 
 	// legacy, to ensure e.g. commonjs plugin still works
@@ -129,6 +131,9 @@ export default function mergeOptions ({
 		paths: getOutputOption('paths'),
 		exports: getOutputOption('exports'),
 		file: getOutputOption('file'),
+		srcDir: getOutputOption('srcDir'),
+		destDir: getOutputOption('destDir'),
+		preserveModules: getOutputOption('preserveModules'),
 	};
 
 	let mergedOutputOptions;

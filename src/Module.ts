@@ -37,6 +37,10 @@ import Import from './ast/nodes/Import';
 import TemplateLiteral from './ast/nodes/TemplateLiteral';
 import Literal from './ast/nodes/Literal';
 import { NodeType } from './ast/nodes/index';
+import ExportSpecifier from './ast/nodes/ExportSpecifier';
+import ClassDeclaration from './ast/nodes/ClassDeclaration';
+import ExecutionPathOptions from './ast/ExecutionPathOptions';
+import { RenderOptions } from './rollup';
 
 const setModuleDynamicImportsReturnBinding = wrapDynamicImportPlugin(acorn);
 
@@ -52,12 +56,15 @@ export interface CommentDescription {
 export interface ExportDescription {
 	localName: string;
 	identifier?: string;
+	specifier?: ExportSpecifier;
+	declaration?: FunctionDeclaration | ClassDeclaration;
 }
 
 export interface ReexportDescription {
 	localName: string;
 	start: number;
 	source: string;
+	specifier: ExportSpecifier;
 	module: Module;
 }
 
@@ -79,11 +86,21 @@ function tryParse (module: Module, acornOptions: Object) {
 }
 
 function includeFully (node: Node) {
+	let addedNewNodes = false;
+	if (!node.included) {
+		addedNewNodes = true;
+	}
 	node.included = true;
 	if (node.variable && !node.variable.included) {
+		addedNewNodes = true;
 		node.variable.includeVariable();
 	}
-	node.eachChild(includeFully);
+	node.eachChild(node => {
+		if (includeFully(node)) {
+			addedNewNodes = true;
+		}
+	});
+	return addedNewNodes;
 }
 
 export interface ModuleJSON {
@@ -130,6 +147,9 @@ export default class Module {
 	sourcemapChain: RawSourceMap[];
 	sources: string[];
 	strongDependencies: (Module | ExternalModule)[];
+	renderedModules: {[name: string]: Module}
+	renderedExternalModules: {[name: string]: ExternalModule};
+	wasOptedInToIncludeAll: boolean;
 
 	ast: Program;
 	private astClone: Program;
@@ -236,6 +256,9 @@ export default class Module {
 		timeEnd('analyse');
 
 		this.strongDependencies = [];
+
+		this.renderedModules = blank();
+		this.renderedExternalModules = blank();
 	}
 
 	private addExport (node: ExportAllDeclaration | ExportNamedDeclaration | ExportDefaultDeclaration) {
@@ -267,6 +290,7 @@ export default class Module {
 						start: specifier.start,
 						source,
 						localName: specifier.local.name,
+						specifier,
 						module: null // filled in later
 					};
 				});
@@ -309,7 +333,7 @@ export default class Module {
 			} else {
 				// export function foo () {}
 				const localName = declaration.id.name;
-				this.exports[localName] = { localName };
+				this.exports[localName] = { localName, declaration };
 			}
 		} else {
 			// export { foo, bar, baz }
@@ -327,7 +351,7 @@ export default class Module {
 					);
 				}
 
-				this.exports[exportedName] = { localName };
+				this.exports[exportedName] = { localName, specifier };
 			});
 		}
 	}
@@ -498,19 +522,51 @@ export default class Module {
 	}
 
 	includeAllInBundle () {
-		this.ast.body.forEach(includeFully);
+		let addedNewNodes = false;
+		this.ast.body.forEach(node => {
+			if (includeFully(node)) {
+				addedNewNodes = true;
+			}
+		});
+		return addedNewNodes;
+	}
+
+	private includeAllModuleInBundle() {
+		let addedNewNodes = false;
+		if (this.includeAllInBundle()) {
+			addedNewNodes = true;
+		}
+		const modules = [this.imports, this.reexports].reduce((modules, type) => {
+			return modules.concat(keys(type).map(key => type[key].module));
+		}, []).concat(this.exportAllModules);
+		new Set(modules).forEach(module => {
+			if (module instanceof Module && module.includeAllModuleInBundle()) {
+				addedNewNodes = true;
+			}
+		});
+		return addedNewNodes;
 	}
 
 	includeInBundle () {
 		let addedNewNodes = false;
-		this.ast.body.forEach((node: Node) => {
-			if (node.shouldBeIncluded()) {
-				if (node.includeInBundle()) {
-					addedNewNodes = true;
+		if (!this.wasOptedInToIncludeAll) {
+			this.ast.body.forEach((node: Node) => {
+				if (node.shouldBeIncluded()) {
+					if (node.includeInBundle()) {
+						addedNewNodes = true;
+					}
 				}
-			}
-		});
+			});
+		} else if (this.includeAllModuleInBundle()) {
+			addedNewNodes = true;
+		}
 		return addedNewNodes;
+	}
+
+	hasEffects () {
+		return this.ast.body.some((node: Node) => {
+			return node.hasEffects(ExecutionPathOptions.create());
+		});
 	}
 
 	processDynamicImports (resolveDynamicImport: ResolveDynamicImportHandler) {
@@ -564,11 +620,13 @@ export default class Module {
 		return this.declarations['*'];
 	}
 
-	render (es: boolean, legacy: boolean, freeze: boolean) {
+	render (es: boolean, legacy: boolean, freeze: boolean, options: RenderOptions = {}) {
 		const magicString = this.magicString.clone();
 
-		for (const node of this.ast.body) {
-			node.render(magicString, es);
+		if (!options.preserveModules || this.graph.treeshake) {
+			for (const node of this.ast.body) {
+				node.render(magicString, es, options);
+			}
 		}
 
 		if (this.namespace().needsNamespaceBlock) {
@@ -612,7 +670,9 @@ export default class Module {
 			const declaration = otherModule.traceExport(importDeclaration.name);
 
 			if (!declaration) {
-				this.error(
+				const log = this.graph.includeMissingExports ? this.warn : this.error;
+				log.call(
+					this,
 					{
 						code: 'MISSING_EXPORT',
 						message: `'${
@@ -622,6 +682,10 @@ export default class Module {
 					},
 					importDeclaration.specifier.start
 				);
+
+				if (this.graph.includeMissingExports && otherModule instanceof Module) {
+					otherModule.wasOptedInToIncludeAll = true;
+				}
 			}
 
 			return declaration;
@@ -645,7 +709,9 @@ export default class Module {
 			);
 
 			if (!declaration) {
-				this.error(
+				const log = this.graph.includeMissingExports ? this.warn : this.error;
+				log.call(
+					this,
 					{
 						code: 'MISSING_EXPORT',
 						message: `'${
@@ -655,6 +721,10 @@ export default class Module {
 					},
 					reexportDeclaration.start
 				);
+
+				if (this.graph.includeMissingExports) {
+					reexportDeclaration.module.wasOptedInToIncludeAll = true;
+				}
 			}
 
 			return declaration;

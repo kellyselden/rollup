@@ -27,6 +27,10 @@ import FunctionExpression from './FunctionExpression';
 import Identifier from './Identifier';
 import IfStatement from './IfStatement';
 import ImportDeclaration from './ImportDeclaration';
+import ImportDefaultSpecifier from './ImportDefaultSpecifier';
+import ImportNamedDeclaration from './ImportNamedDeclaration';
+import ImportNamespaceSpecifier from './ImportNamespaceSpecifier';
+import ImportSpecifier from './ImportSpecifier';
 import LabeledStatement from './LabeledStatement';
 import Literal from './Literal';
 import LogicalExpression from './LogicalExpression';
@@ -88,6 +92,7 @@ export const enum NodeType {
 	Import = 'Import',
 	ImportDeclaration = 'ImportDeclaration',
 	ImportDefaultSpecifier = 'ImportDefaultSpecifier',
+	ImportNamedDeclaration = 'ImportNamedDeclaration',
 	ImportNamespaceSpecifier = 'ImportNamespaceSpecifier',
 	ImportSpecifier = 'ImportSpecifier',
 	LabeledStatement = 'LabeledStatement',
@@ -152,6 +157,10 @@ const nodes: {
 	Identifier,
 	IfStatement,
 	ImportDeclaration,
+	ImportDefaultSpecifier,
+	ImportNamedDeclaration,
+	ImportNamespaceSpecifier,
+	ImportSpecifier,
 	LabeledStatement,
 	Literal,
 	LogicalExpression,
