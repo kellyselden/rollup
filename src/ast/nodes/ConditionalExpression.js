@@ -56,12 +56,12 @@ export default class ConditionalExpression extends Node {
 
 	render ( code, es ) {
 		if ( !this.module.bundle.treeshake ) {
-			super.render( code, es );
+			super.render.apply( this, arguments );
 		}
 
 		else {
 			if ( this.testValue === UNKNOWN_VALUE ) {
-				super.render( code, es );
+				super.render.apply( this, arguments );
 			}
 
 			else {
@@ -73,7 +73,7 @@ export default class ConditionalExpression extends Node {
 					code.prependLeft( branchToRetain.start, '(' );
 					code.appendRight( branchToRetain.end, ')' );
 				}
-				branchToRetain.render( code, es );
+				branchToRetain.render( ...arguments );
 			}
 		}
 	}

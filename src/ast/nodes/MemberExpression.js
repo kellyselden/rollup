@@ -54,6 +54,10 @@ export default class MemberExpression extends Node {
 					}, part.start );
 					this.replacement = 'undefined';
 					return;
+				} else {
+					if (this.scope.namespacedVariables) {
+						this.scope.namespacedVariables.push(variable);
+					}
 				}
 
 				keypath.parts.shift();
@@ -147,7 +151,7 @@ export default class MemberExpression extends Node {
 			code.overwrite( this.start, this.end, this.replacement, { storeName: true, contentOnly: false } );
 		}
 
-		super.render( code, es );
+		super.render.apply( this, arguments );
 	}
 
 	someReturnExpressionWhenCalledAtPath ( path, callOptions, predicateFunction, options ) {

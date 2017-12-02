@@ -8,9 +8,9 @@ export default class FunctionDeclaration extends FunctionNode {
 		this.body.initialiseAndReplaceScope( new Scope( { parent: this.scope } ) );
 	}
 
-	render ( code, es ) {
+	render ( code ) {
 		if ( !this.module.bundle.treeshake || this.included ) {
-			super.render( code, es );
+			super.render.apply( this, arguments );
 		} else {
 			code.remove( this.leadingCommentStart || this.start, this.next || this.end );
 		}

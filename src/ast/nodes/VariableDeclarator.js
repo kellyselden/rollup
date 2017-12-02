@@ -26,6 +26,6 @@ export default class VariableDeclarator extends Node {
 			}
 		} );
 
-		super.render( code, es );
+		super.render.apply( this, arguments );
 	}
 }

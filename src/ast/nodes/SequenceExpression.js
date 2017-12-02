@@ -25,14 +25,14 @@ export default class SequenceExpression extends Node {
 		return addedNewNodes;
 	}
 
-	render ( code, es ) {
+	render ( code ) {
 		if ( !this.module.bundle.treeshake ) {
-			super.render( code, es );
+			super.render.apply( this, arguments );
 		}
 
 		else {
 			const last = this.expressions[ this.expressions.length - 1 ];
-			last.render( code, es );
+			last.render( ...arguments );
 
 			if ( this.parent.type === 'CallExpression' && last.type === 'MemberExpression' && this.expressions.length > 1 ) {
 				this.expressions[0].included = true;
@@ -45,7 +45,7 @@ export default class SequenceExpression extends Node {
 			} else {
 				let previousEnd = this.start;
 				for ( const expression of included ) {
-					expression.render( code, es );
+					expression.render( ...arguments );
 					code.remove( previousEnd, expression.start );
 					code.appendLeft( expression.end, ', ' );
 					previousEnd = expression.end;

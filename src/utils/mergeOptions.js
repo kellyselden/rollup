@@ -62,6 +62,8 @@ export default function mergeOptions ({
 		cache: getInputOption( 'cache' ),
 		preferConst: getInputOption( 'preferConst' ),
 		experimentalDynamicImport: getInputOption( 'experimentalDynamicImport' ),
+		preserveSymlinks: config.preserveSymlinks,
+		includeMissingExports: config.includeMissingExports,
 	};
 
 	// legacy, to ensure e.g. commonjs plugin still works

@@ -42,7 +42,7 @@ export default class ExportDefaultDeclaration extends Node {
 		this.variable = this.scope.addExportDefaultDeclaration( this._declarationName || this.module.basename(), this );
 	}
 
-	render ( code, es ) {
+	render ( code, es, preserveModules ) {
 		const remove = () => { code.remove( this.leadingCommentStart || this.start, this.next || this.end ); };
 		const removeExportDefault = () => { code.remove( this.start, declaration_start ); };
 
@@ -58,13 +58,15 @@ export default class ExportDefaultDeclaration extends Node {
 				return remove();
 			}
 
-			// Add the id to anonymous declarations
-			if ( !this.declaration.id ) {
-				const id_insertPos = this.start + statementStr.match( sourceRE.declarationHeader )[ 0 ].length;
-				code.appendLeft( id_insertPos, ` ${name}` );
-			}
+			if ( !preserveModules || !this.included ) {
+				// Add the id to anonymous declarations
+				if ( !this.declaration.id ) {
+					const id_insertPos = this.start + statementStr.match( sourceRE.declarationHeader )[ 0 ].length;
+					code.appendLeft( id_insertPos, ` ${name}` );
+				}
 
-			removeExportDefault();
+				removeExportDefault();
+			}
 		} else {
 			if ( treeshakeable ) {
 				const hasEffects = this.declaration.hasEffects( ExecutionPathOptions.create() );
@@ -73,17 +75,21 @@ export default class ExportDefaultDeclaration extends Node {
 
 			// Prevent `var foo = foo`
 			if ( this.variable.getOriginalVariableName( es ) === name ) {
-				return remove();
+				if ( !preserveModules || !this.included ) {
+					return remove();
+				}
 			}
 
 			// Only output `var foo =` if `foo` is used
 			if ( this.included ) {
-				code.overwrite( this.start, declaration_start, `${this.module.bundle.varOrConst} ${name} = ` );
+				if ( !preserveModules ) {
+					code.overwrite( this.start, declaration_start, `${this.module.bundle.varOrConst} ${name} = ` );
+				}
 			} else {
 				removeExportDefault();
 			}
 		}
-		super.render( code, es );
+		super.render.apply( this, arguments );
 
 	}
 }

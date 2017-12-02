@@ -117,7 +117,7 @@ export default class VariableDeclaration extends Node {
 				}
 			}
 
-			declarator.render( code, es );
+			declarator.render( ...arguments );
 		}
 
 		if ( treeshake && empty ) {

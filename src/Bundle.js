@@ -126,6 +126,9 @@ export default class Bundle {
 			this.acornOptions.plugins = this.acornOptions.plugins || {};
 			this.acornOptions.plugins.dynamicImport = true;
 		}
+
+		this.preserveSymlinks = options.preserveSymlinks;
+		this.includeMissingExports = options.includeMissingExports;
 	}
 
 	collectAddon ( initialAddon, addonName, sep = '\n' ) {
@@ -210,6 +213,11 @@ export default class Bundle {
 				this.entryModule.getExports().forEach( name => {
 					const variable = this.entryModule.traceExport( name );
 
+					const y = this.entryModule.exports[name];
+					if (y && y.specifier) {
+						y.specifier.includeInBundle();
+					}
+
 					variable.exportName = name;
 					variable.includeVariable();
 
@@ -221,13 +229,42 @@ export default class Bundle {
 				this.entryModule.getReexports().forEach( name => {
 					const variable = this.entryModule.traceExport( name );
 
-					if ( variable.isExternal ) {
-						variable.reexported = variable.module.reexported = true;
-					} else {
-						variable.exportName = name;
-						variable.includeVariable();
+					const y = this.entryModule.reexports[name];
+					if (y && !y.module.isExternal) {
+						y.module.ast.body.forEach(node => {
+							if (node.type === 'ExportNamedDeclaration') {
+								node.specifiers.forEach(specifier => {
+									if (specifier.exported.name === y.localName) {
+										specifier.includeInBundle();
+									}
+								});
+							} else if (y.localName === 'default' && node.type === 'ExportDefaultDeclaration') {
+								node.includeInBundle();
+							}
+						});
+					}
+					if (y && y.specifier) {
+						y.specifier.includeInBundle();
+					}
+
+					if (variable) {
+						if ( variable.isExternal ) {
+							variable.reexported = variable.module.reexported = true;
+						} else {
+							variable.exportName = name;
+							variable.includeVariable();
+						}
 					}
 				} );
+
+				this.entryModule.ast.body.forEach(node => {
+					if (node.type === 'ExportAllDeclaration') {
+						// let x = this.entryModule.resolvedIds[node.source.value];
+						// if (this.entryModule.resolvedExternalIds[node.source.value]) {
+						node.includeInBundle();
+						// }
+					}
+				});
 
 				// mark statements that should appear in the bundle
 				if ( this.treeshake ) {

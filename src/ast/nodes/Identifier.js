@@ -44,6 +44,38 @@ export default class Identifier extends Node {
 	includeInBundle () {
 		if ( this.included ) return false;
 		this.included = true;
+		const x = this._getImport(this.name);
+		x && x.specifier.includeInBundle();
+		// if (x) {
+		//   const otherModule = x.module;
+
+		//   const exportDeclaration = otherModule.exports && otherModule.exports[ x.name ];
+		//   if ( exportDeclaration ) {
+		// 		if (exportDeclaration.specifier) {
+		// 			exportDeclaration.specifier.includeInBundle();
+		// 		} else if (exportDeclaration.declaration) {
+		// 			exportDeclaration.declaration.includeInBundle();
+		// 		}
+		//   }
+		//   const reexportDeclaration = otherModule.reexports && otherModule.reexports[ x.name ];
+		//   if ( reexportDeclaration ) {
+		// 		reexportDeclaration.specifier.includeInBundle();
+		//   }
+		// }
+		const y = this.module.reexports[this.name];
+		if (y && !y.module.isExternal) {
+			y.module.ast.body.forEach(node => {
+				if (node.type === 'ExportNamedDeclaration') {
+					node.specifiers.forEach(specifier => {
+						if (specifier.exported.name === y.localName) {
+							specifier.includeInBundle();
+						}
+					});
+				} else if (y.localName === 'default' && node.type === 'ExportDefaultDeclaration') {
+					node.includeInBundle();
+				}
+			});
+		}
 		this.variable && this.variable.includeVariable();
 		return true;
 	}
@@ -68,7 +100,11 @@ export default class Identifier extends Node {
 		}
 	}
 
-	render ( code, es ) {
+	render ( code, es, preserveModules ) {
+		if (preserveModules) {
+			return;
+		}
+
 		if ( this.variable ) {
 			const name = this.variable.getName( es );
 			if ( name !== this.name ) {

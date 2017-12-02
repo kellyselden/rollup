@@ -14,10 +14,23 @@ export default class ExportNamedDeclaration extends Node {
 		this.isExportDeclaration = true;
 	}
 
-	render ( code, es ) {
+	// includeInBundle () {
+	// 	if ( this.included ) return false;
+	// 	this.included = true;
+	// 	if ( this.declaration ) {
+	// 		this.declaration.includeInBundle();
+	// 	}
+	// 	this.specifiers.forEach(specifier => {
+	// 		specifier.includeInBundle();
+	// 	});
+	// }
+
+	render ( code, es, preserveModules ) {
 		if ( this.declaration ) {
-			code.remove( this.start, this.declaration.start );
-			this.declaration.render( code, es );
+			if (!preserveModules || !this.included) {
+				code.remove( this.start, this.declaration.start );
+			}
+			this.declaration.render( ...arguments );
 		} else {
 			const start = this.leadingCommentStart || this.start;
 			const end = this.next || this.end;
@@ -32,7 +45,9 @@ export default class ExportNamedDeclaration extends Node {
 				}
 			}
 
-			code.remove( start, end );
+			if (!preserveModules || !this.included) {
+				code.remove( start, end );
+			}
 		}
 	}
 }

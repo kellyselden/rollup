@@ -13,6 +13,7 @@ export default class ModuleScope extends Scope {
 
 		this.module = module;
 		this.variables.this = new LocalVariable( 'this', null, UNDEFINED_ASSIGNMENT );
+		this.namespacedVariables = [];
 	}
 
 	deshadow ( names ) {

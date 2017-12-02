@@ -73,9 +73,9 @@ export default class Property extends Node {
 
 	render ( code, es ) {
 		if ( !this.shorthand ) {
-			this.key.render( code, es );
+			this.key.render( ...arguments );
 		}
-		this.value.render( code, es );
+		this.value.render( ...arguments );
 	}
 
 	someReturnExpressionWhenCalledAtPath ( path, callOptions, predicateFunction, options ) {
