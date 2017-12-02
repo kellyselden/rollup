@@ -147,7 +147,7 @@ export default class MemberExpression extends Node {
 			code.overwrite( this.start, this.end, this.replacement, { storeName: true, contentOnly: false } );
 		}
 
-		super.render( code, es );
+		super.render.apply( this, arguments );
 	}
 
 	someReturnExpressionWhenCalledAtPath ( path, callOptions, predicateFunction, options ) {

@@ -5,7 +5,9 @@ export default class ExportAllDeclaration extends Node {
 		this.isExportDeclaration = true;
 	}
 
-	render ( code ) {
-		code.remove( this.leadingCommentStart || this.start, this.next || this.end );
+	render ( code, es, preserveModules ) {
+		if ( !preserveModules || !this.included ) {
+			code.remove( this.leadingCommentStart || this.start, this.next || this.end );
+		}
 	}
 }

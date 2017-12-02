@@ -47,13 +47,13 @@ export default class BlockStatement extends Statement {
 		this.scope = new BlockScope( { parent: parentScope } );
 	}
 
-	render ( code, es ) {
+	render () {
 		if ( this.body.length ) {
 			for ( const node of this.body ) {
-				node.render( code, es );
+				node.render( ...arguments );
 			}
 		} else {
-			Statement.prototype.render.call( this, code, es );
+			Statement.prototype.render.apply( this, arguments );
 		}
 	}
 }

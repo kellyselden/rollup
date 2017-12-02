@@ -18,6 +18,7 @@ import EmptyStatement from './EmptyStatement.js';
 import ExportAllDeclaration from './ExportAllDeclaration.js';
 import ExportDefaultDeclaration from './ExportDefaultDeclaration.js';
 import ExportNamedDeclaration from './ExportNamedDeclaration.js';
+import ExportSpecifier from './ExportSpecifier.js';
 import ExpressionStatement from './ExpressionStatement.js';
 import ForStatement from './ForStatement.js';
 import ForInStatement from './ForInStatement.js';
@@ -27,6 +28,9 @@ import FunctionExpression from './FunctionExpression.js';
 import Identifier from './Identifier.js';
 import IfStatement from './IfStatement.js';
 import ImportDeclaration from './ImportDeclaration.js';
+import ImportDefaultSpecifier from './ImportDefaultSpecifier.js';
+import ImportNamedDeclaration from './ImportNamedDeclaration.js';
+import ImportSpecifier from './ImportSpecifier.js';
 import LabeledStatement from './LabeledStatement.js';
 import Literal from './Literal.js';
 import LogicalExpression from './LogicalExpression.js';
@@ -75,6 +79,7 @@ export default {
 	ExportAllDeclaration,
 	ExportDefaultDeclaration,
 	ExportNamedDeclaration,
+	ExportSpecifier,
 	ExpressionStatement,
 	ForStatement,
 	ForInStatement,
@@ -84,6 +89,9 @@ export default {
 	Identifier,
 	IfStatement,
 	ImportDeclaration,
+	ImportDefaultSpecifier,
+	ImportNamedDeclaration,
+	ImportSpecifier,
 	LabeledStatement,
 	Literal,
 	LogicalExpression,

@@ -41,6 +41,11 @@ function includeFully ( node ) {
 	node.eachChild( includeFully );
 }
 
+function includeAllInBundle(module) {
+	module.includeAllInBundle();
+	module.exportAllModules.forEach(includeAllInBundle);
+}
+
 export default class Module {
 	constructor ( { id, code, originalCode, originalSourcemap, ast, sourcemapChain, resolvedIds, resolvedExternalIds, bundle } ) {
 		this.code = code;
@@ -142,6 +147,7 @@ export default class Module {
 						start: specifier.start,
 						source,
 						localName: specifier.local.name,
+						specifier,
 						module: null // filled in later
 					};
 				} );
@@ -183,7 +189,7 @@ export default class Module {
 			} else {
 				// export function foo () {}
 				const localName = declaration.id.name;
-				this.exports[ localName ] = { localName };
+				this.exports[ localName ] = { localName, declaration };
 			}
 		}
 
@@ -200,7 +206,7 @@ export default class Module {
 					}, specifier.start );
 				}
 
-				this.exports[ exportedName ] = { localName };
+				this.exports[ exportedName ] = { localName, specifier };
 			} );
 		}
 	}
@@ -372,11 +378,11 @@ export default class Module {
 		return this.declarations[ '*' ];
 	}
 
-	render ( es, legacy, freeze ) {
+	render ( es, legacy, freeze, preserveModules ) {
 		const magicString = this.magicString.clone();
 
 		for ( const node of this.ast.body ) {
-			node.render( magicString, es );
+			node.render( magicString, es, preserveModules );
 		}
 
 		if ( this.namespace().needsNamespaceBlock ) {
@@ -417,11 +423,16 @@ export default class Module {
 			const declaration = otherModule.traceExport( importDeclaration.name );
 
 			if ( !declaration ) {
-				this.error( {
+				const log = this.bundle.includeMissingExports ? this.warn : this.error;
+				log.call( this, {
 					code: 'MISSING_EXPORT',
 					message: `'${importDeclaration.name}' is not exported by ${relativeId( otherModule.id )}`,
 					url: `https://github.com/rollup/rollup/wiki/Troubleshooting#name-is-not-exported-by-module`
 				}, importDeclaration.specifier.start );
+
+				if (this.bundle.includeMissingExports) {
+					includeAllInBundle(otherModule);
+				}
 			}
 
 			return declaration;
@@ -443,11 +454,16 @@ export default class Module {
 			const declaration = reexportDeclaration.module.traceExport( reexportDeclaration.localName );
 
 			if ( !declaration ) {
-				this.error( {
+				const log = this.bundle.includeMissingExports ? this.warn : this.error;
+				log.call( this, {
 					code: 'MISSING_EXPORT',
 					message: `'${reexportDeclaration.localName}' is not exported by ${relativeId( reexportDeclaration.module.id )}`,
 					url: `https://github.com/rollup/rollup/wiki/Troubleshooting#name-is-not-exported-by-module`
 				}, reexportDeclaration.start );
+
+				if (this.bundle.includeMissingExports) {
+					includeAllInBundle(reexportDeclaration.module);
+				}
 			}
 
 			return declaration;

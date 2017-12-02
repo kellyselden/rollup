@@ -7,11 +7,11 @@ export function load ( id ) {
 	return readFileSync( id, 'utf-8' );
 }
 
-function findFile ( file ) {
+function findFile ( file, preserveSymlinks ) {
 	try {
 		const stats = lstatSync( file );
-		if ( stats.isSymbolicLink() ) return findFile( realpathSync( file ) );
-		if ( stats.isFile() ) {
+		if ( !preserveSymlinks && stats.isSymbolicLink() ) return findFile( realpathSync( file ) );
+		if ( ( preserveSymlinks && stats.isSymbolicLink() ) || stats.isFile() ) {
 			// check case
 			const name = basename( file );
 			const files = readdirSync( dirname( file ) );
@@ -23,8 +23,8 @@ function findFile ( file ) {
 	}
 }
 
-function addJsExtensionIfNecessary ( file ) {
-	return findFile( file ) || findFile( file + '.js' );
+function addJsExtensionIfNecessary ( file, preserveSymlinks ) {
+	return findFile( file, preserveSymlinks ) || findFile( file + '.js', preserveSymlinks );
 }
 
 export function resolveId ( importee, importer ) {
@@ -45,7 +45,9 @@ export function resolveId ( importee, importer ) {
 	// resolve call and require no special handing on our part.
 	// See https://nodejs.org/api/path.html#path_path_resolve_paths
 	return addJsExtensionIfNecessary(
-		resolve( importer ? dirname( importer ) : resolve(), importee ) );
+		resolve( importer ? dirname( importer ) : resolve(), importee ),
+		this.preserveSymlinks
+	);
 }
 
 

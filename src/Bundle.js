@@ -118,6 +118,8 @@ export default class Bundle {
 		this.varOrConst = options.preferConst ? 'const' : 'var';
 		this.legacy = options.legacy;
 		this.acornOptions = options.acorn || {};
+		this.preserveSymlinks = options.preserveSymlinks;
+		this.includeMissingExports = options.includeMissingExports;
 	}
 
 	collectAddon ( initialAddon, addonName, sep = '\n' ) {
@@ -206,11 +208,28 @@ export default class Bundle {
 				entryModule.getReexports().forEach( name => {
 					const variable = entryModule.traceExport( name );
 
-					if ( variable.isExternal ) {
-						variable.reexported = variable.module.reexported = true;
-					} else {
-						variable.exportName = name;
-						variable.includeVariable();
+          let y = entryModule.reexports[name];
+					if (y && !y.module.isExternal) {
+            y.module.ast.body.forEach(node => {
+              if (node.type === 'ExportNamedDeclaration') {
+                node.specifiers.forEach(specifier => {
+                  if (specifier.exported.name === y.localName) {
+                    specifier.includeInBundle();
+                  }
+                });
+              } else if (y.localName === 'default' && node.type === 'ExportDefaultDeclaration') {
+                node.includeInBundle();
+              }
+            });
+          }
+
+					if (variable) {
+						if ( variable.isExternal ) {
+							variable.reexported = variable.module.reexported = true;
+						} else {
+							variable.exportName = name;
+							variable.includeVariable();
+						}
 					}
 				} );
 

@@ -61,7 +61,7 @@ export default class IfStatement extends Statement {
 	render ( code, es ) {
 		if ( this.module.bundle.treeshake ) {
 			if ( this.testValue === UNKNOWN_VALUE ) {
-				super.render( code, es );
+				super.render.apply( this, arguments );
 			}
 
 			else {
@@ -86,14 +86,14 @@ export default class IfStatement extends Statement {
 				if ( this.testValue ) {
 					code.remove( this.start, this.consequent.start );
 					code.remove( this.consequent.end, this.end );
-					this.consequent.render( code, es );
+					this.consequent.render( ...arguments );
 				}
 
 				else {
 					code.remove( this.start, this.alternate ? this.alternate.start : this.next || this.end );
 
 					if ( this.alternate ) {
-						this.alternate.render( code, es );
+						this.alternate.render( ...arguments );
 					}
 
 					else if ( statementsWithIfStatements.has( this.parent.type ) ) {
@@ -104,7 +104,7 @@ export default class IfStatement extends Statement {
 		}
 
 		else {
-			super.render( code, es );
+			super.render.apply( this, arguments );
 		}
 	}
 }

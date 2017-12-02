@@ -9,7 +9,7 @@ export default class ClassDeclaration extends ClassNode {
 
 	render ( code, es ) {
 		if ( !this.module.bundle.treeshake || this.included ) {
-			super.render( code, es );
+			super.render.apply( this, arguments );
 		} else {
 			code.remove( this.leadingCommentStart || this.start, this.next || this.end );
 		}

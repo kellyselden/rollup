@@ -9,6 +9,20 @@ export default class Node {
 		this.keys = [];
 	}
 
+	_getImport(name) {
+		let x = Object.keys(this.module.imports).filter(key => {
+			const x = this.module.imports[key];
+			if (x.specifier && x.specifier.type === 'ImportDefaultSpecifier') {
+				return key === name;
+			}
+			return x.name === name;
+		})[0];
+		if (x) {
+			x = this.module.imports[x];
+		}
+		return x;
+	}
+
 	/**
 	 * Called once all nodes have been initialised and the scopes have been populated.
 	 * Usually one should not override this function but override bindNode and/or
@@ -198,8 +212,8 @@ export default class Node {
 		return location;
 	}
 
-	render ( code, es ) {
-		this.eachChild( child => child.render( code, es ) );
+	render () {
+		this.eachChild( child => child.render( ...arguments ) );
 	}
 
 	/**

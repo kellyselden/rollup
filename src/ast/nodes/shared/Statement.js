@@ -1,9 +1,9 @@
 import Node from '../../Node.js';
 
 export default class Statement extends Node {
-	render ( code, es ) {
+	render ( code ) {
 		if ( !this.module.bundle.treeshake || this.included ) {
-			super.render( code, es );
+			super.render.apply( this, arguments );
 		} else {
 			code.remove( this.leadingCommentStart || this.start, this.next || this.end );
 		}
