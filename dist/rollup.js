@@ -1,6 +1,6 @@
 /*
 	Rollup.js v0.53.4
-	Sat Jan 13 2018 17:07:37 GMT-0800 (Pacific Standard Time) - commit bb9f40aedaeafe3e6ff6373a253433fd12344b29
+	Sun Jan 14 2018 08:20:49 GMT-0800 (Pacific Standard Time) - commit 9da51f6724224e270c7b0794f7cfc911a0176b46
 
 
 	https://github.com/rollup/rollup
@@ -13451,7 +13451,7 @@ function createSources(externalModule, node) {
             sources[variable.name] = {
                 included: true,
                 imported: variable.name,
-                local: variable instanceof ExternalVariable ? variable.safeName : null
+                local: variable instanceof ExternalVariable ? variable.name : null
             };
         });
         var id_1 = resolveId(node.source.value.toString());
@@ -13512,7 +13512,10 @@ function createExternalImportString(externalModule, _a) {
         .filter(Boolean);
     if (sources.default) {
         if (externalModule instanceof ExternalModule) {
-            var name = externalModule.name || sources.default.local;
+            var name = sources.default.local;
+            if (!node && externalModule.name) {
+                name = externalModule.name;
+            }
             if (externalModule.exportsNamespace && !node) {
                 specifiersList.push([name + "__default"]);
             }
@@ -17642,17 +17645,20 @@ var Module = /** @class */ (function () {
     };
     Module.prototype.includeAllModuleInBundle = function () {
         var addedNewNodes = false;
-        if (this.includeAllInBundle()) {
-            addedNewNodes = true;
-        }
-        var modules = [this.imports, this.reexports].reduce(function (modules, type) {
-            return modules.concat(keys(type).map(function (key) { return type[key].module; }));
-        }, []).concat(this.exportAllModules);
-        new Set(modules).forEach(function (module) {
-            if (module instanceof Module && module.includeAllModuleInBundle()) {
+        if (!this.wasIncludeAllVisited) {
+            this.wasIncludeAllVisited = true;
+            if (this.includeAllInBundle()) {
                 addedNewNodes = true;
             }
-        });
+            var modules = [this.imports, this.reexports].reduce(function (modules, type) {
+                return modules.concat(keys(type).map(function (key) { return type[key].module; }));
+            }, []).concat(this.exportAllModules);
+            new Set(modules).forEach(function (module) {
+                if (module instanceof Module && module.includeAllModuleInBundle()) {
+                    addedNewNodes = true;
+                }
+            });
+        }
         return addedNewNodes;
     };
     Module.prototype.includeInBundle = function () {
@@ -17666,8 +17672,11 @@ var Module = /** @class */ (function () {
                 }
             });
         }
-        else if (this.includeAllModuleInBundle()) {
-            addedNewNodes = true;
+        else {
+            this.wasOptedInToIncludeAll = false;
+            if (this.includeAllModuleInBundle()) {
+                addedNewNodes = true;
+            }
         }
         return addedNewNodes;
     };
@@ -17736,7 +17745,7 @@ var Module = /** @class */ (function () {
                 node.render(magicString, es, options);
             }
         }
-        if (this.namespace().needsNamespaceBlock) {
+        if (!options.preserveModules && this.namespace().needsNamespaceBlock) {
             magicString.append('\n\n' + this.namespace().renderBlock(es, legacy, freeze, '\t')); // TODO use correct indentation
         }
         // TODO TypeScript: It seems magicString is missing type information here
@@ -18770,7 +18779,7 @@ var Bundle$1 = /** @class */ (function () {
         var _this = this;
         var getPath = this.createGetPath(options);
         var promises = this.orderedModules.map(function (module) {
-            var source = module.render(true, false, true, {
+            var source = module.render(true, false, false, {
                 preserveModules: true,
                 bundle: _this,
                 getPath: getPath

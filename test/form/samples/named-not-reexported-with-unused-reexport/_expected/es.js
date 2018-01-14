@@ -2,4 +2,4 @@ function bar() {
   this.baz = 1;
 }
 
-console.log( foo );
+console.log(foo);

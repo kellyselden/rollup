@@ -55,7 +55,7 @@ export function createSources (externalModule: Module | ExternalModule, node: Im
 			sources[variable.name] = {
 				included: true,
 				imported: variable.name,
-				local: variable instanceof ExternalVariable ? variable.safeName : null
+				local: variable instanceof ExternalVariable ? variable.name : null
 			};
 		});
 
@@ -121,7 +121,10 @@ export function createExternalImportString (externalModule: Module | ExternalMod
 
 	if (sources.default) {
 		if (externalModule instanceof ExternalModule) {
-			const name = externalModule.name || sources.default.local;
+			let name = sources.default.local;
+			if (!node && externalModule.name) {
+				name = externalModule.name;
+			}
 			if (externalModule.exportsNamespace && !node) {
 				specifiersList.push([`${name}__default`]);
 			} else {

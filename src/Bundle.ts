@@ -214,7 +214,7 @@ export default class Bundle {
 		const getPath = this.createGetPath(options);
 
 		const promises = this.orderedModules.map(module => {
-			const source = module.render(true, false, true, {
+			const source = module.render(true, false, false, {
 				preserveModules: true,
 				bundle: this,
 				getPath

@@ -8,6 +8,6 @@ define(function () { 'use strict';
         this.baz = 1;
     }
 
-    console.log( foo );
+    console.log(foo);
 
 });

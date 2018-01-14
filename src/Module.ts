@@ -87,19 +87,23 @@ function tryParse (module: Module, acornOptions: Object) {
 
 function includeFully (node: Node) {
 	let addedNewNodes = false;
+
 	if (!node.included) {
 		addedNewNodes = true;
 	}
 	node.included = true;
+
 	if (node.variable && !node.variable.included) {
 		addedNewNodes = true;
 		node.variable.includeVariable();
 	}
+
 	node.eachChild(node => {
 		if (includeFully(node)) {
 			addedNewNodes = true;
 		}
 	});
+
 	return addedNewNodes;
 }
 
@@ -149,7 +153,9 @@ export default class Module {
 	strongDependencies: (Module | ExternalModule)[];
 	renderedModules: {[name: string]: Module}
 	renderedExternalModules: {[name: string]: ExternalModule};
+
 	wasOptedInToIncludeAll: boolean;
+	wasIncludeAllVisited: boolean;
 
 	ast: Program;
 	private astClone: Program;
@@ -533,22 +539,30 @@ export default class Module {
 
 	private includeAllModuleInBundle() {
 		let addedNewNodes = false;
-		if (this.includeAllInBundle()) {
-			addedNewNodes = true;
-		}
-		const modules = [this.imports, this.reexports].reduce((modules, type) => {
-			return modules.concat(keys(type).map(key => type[key].module));
-		}, []).concat(this.exportAllModules);
-		new Set(modules).forEach(module => {
-			if (module instanceof Module && module.includeAllModuleInBundle()) {
+
+		if (!this.wasIncludeAllVisited) {
+			this.wasIncludeAllVisited = true;
+
+			if (this.includeAllInBundle()) {
 				addedNewNodes = true;
 			}
-		});
+
+			const modules = [this.imports, this.reexports].reduce((modules, type) => {
+				return modules.concat(keys(type).map(key => type[key].module));
+			}, []).concat(this.exportAllModules);
+			new Set(modules).forEach(module => {
+				if (module instanceof Module && module.includeAllModuleInBundle()) {
+					addedNewNodes = true;
+				}
+			});
+		}
+
 		return addedNewNodes;
 	}
 
 	includeInBundle () {
 		let addedNewNodes = false;
+
 		if (!this.wasOptedInToIncludeAll) {
 			this.ast.body.forEach((node: Node) => {
 				if (node.shouldBeIncluded()) {
@@ -557,9 +571,13 @@ export default class Module {
 					}
 				}
 			});
-		} else if (this.includeAllModuleInBundle()) {
-			addedNewNodes = true;
+		} else {
+			this.wasOptedInToIncludeAll = false;
+			if (this.includeAllModuleInBundle()) {
+				addedNewNodes = true;
+			}
 		}
+
 		return addedNewNodes;
 	}
 
@@ -629,7 +647,7 @@ export default class Module {
 			}
 		}
 
-		if (this.namespace().needsNamespaceBlock) {
+		if (!options.preserveModules && this.namespace().needsNamespaceBlock) {
 			magicString.append(
 				'\n\n' + this.namespace().renderBlock(es, legacy, freeze, '\t')
 			); // TODO use correct indentation
