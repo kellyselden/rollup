@@ -76,6 +76,7 @@ export default function mergeOptions ({
 		preserveSymlinks: config.preserveSymlinks,
 		includeMissingExports: config.includeMissingExports,
 		includeAllNamespacedInternal: config.includeAllNamespacedInternal,
+		includeNamespaceConflicts: config.includeNamespaceConflicts,
 	};
 
 	// legacy, to ensure e.g. commonjs plugin still works
@@ -134,6 +135,7 @@ export default function mergeOptions ({
 		srcDir: getOutputOption('srcDir'),
 		destDir: getOutputOption('destDir'),
 		preserveModules: getOutputOption('preserveModules'),
+		excludedModules: getOutputOption('excludedModules'),
 	};
 
 	let mergedOutputOptions;

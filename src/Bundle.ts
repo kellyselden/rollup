@@ -214,6 +214,9 @@ export default class Bundle {
 		const getPath = this.createGetPath(options);
 
 		const promises = this.orderedModules.map(module => {
+			if (options.excludedModules && options.excludedModules.indexOf(module.id) > -1) {
+			  return;
+			}
 			const source = module.render(true, false, false, {
 				preserveModules: true,
 				bundle: this,

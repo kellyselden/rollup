@@ -42,6 +42,7 @@ export default class Graph {
 	hasLoaders: boolean;
 	includeAllNamespacedInternal: boolean;
 	includeMissingExports: boolean;
+	includeNamespaceConflicts: boolean;
 	isExternal: IsExternalHook;
 	isPureExternalModule: (id: string) => boolean;
 	legacy: boolean;
@@ -168,6 +169,7 @@ export default class Graph {
 		this.preserveSymlinks = options.preserveSymlinks;
 		this.includeMissingExports = options.includeMissingExports;
 		this.includeAllNamespacedInternal = options.includeAllNamespacedInternal;
+		this.includeNamespaceConflicts = options.includeNamespaceConflicts;
 	}
 
 	private loadModule (entryName: string) {
@@ -314,7 +316,7 @@ export default class Graph {
 
 	private mark (entryModule: Module) {
 		entryModule.getExports().forEach(name => {
-			const variable = entryModule.traceExport(name);
+			const [variable] = entryModule.traceExport(name);
 
 			const y = entryModule.exports[name];
 			if (y && y.specifier) {
@@ -330,7 +332,7 @@ export default class Graph {
 		});
 
 		entryModule.getReexports().forEach(name => {
-			const variable = entryModule.traceExport(name);
+			let variables = entryModule.traceExport(name);
 
 			const y = entryModule.reexports[name];
 			if (y && !y.module.isExternal) {
@@ -350,14 +352,14 @@ export default class Graph {
 				y.specifier.includeInBundle();
 			}
 
-			if (variable) {
+			variables.forEach(variable => {
 				if (isExternalVariable(variable)) {
 					variable.reexported = variable.module.reexported = true;
 				} else {
 					variable.exportName = name;
 					variable.includeVariable();
 				}
-			}
+			});
 		});
 
 		entryModule.ast.body.forEach(node => {
@@ -584,7 +586,7 @@ export default class Graph {
 						if (exportAllModule.isExternal) return;
 
 						keys((<Module>exportAllModule).exportsAll).forEach(name => {
-							if (name in module.exportsAll) {
+							if (!this.includeNamespaceConflicts && name in module.exportsAll) {
 								this.warn({
 									code: 'NAMESPACE_CONFLICT',
 									reexporter: module.id,

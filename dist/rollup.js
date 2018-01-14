@@ -1,6 +1,6 @@
 /*
 	Rollup.js v0.53.4
-	Sun Jan 14 2018 08:20:49 GMT-0800 (Pacific Standard Time) - commit 9da51f6724224e270c7b0794f7cfc911a0176b46
+	Mon Jan 15 2018 13:57:03 GMT-0800 (Pacific Standard Time) - commit 72475565787638d89ec696bf0fc8f23c94f75bb0
 
 
 	https://github.com/rollup/rollup
@@ -462,6 +462,7 @@ function mergeOptions(_a) {
         preserveSymlinks: config.preserveSymlinks,
         includeMissingExports: config.includeMissingExports,
         includeAllNamespacedInternal: config.includeAllNamespacedInternal,
+        includeNamespaceConflicts: config.includeNamespaceConflicts,
     };
     // legacy, to ensure e.g. commonjs plugin still works
     inputOptions.entry = inputOptions.input;
@@ -518,6 +519,7 @@ function mergeOptions(_a) {
         srcDir: getOutputOption('srcDir'),
         destDir: getOutputOption('destDir'),
         preserveModules: getOutputOption('preserveModules'),
+        excludedModules: getOutputOption('excludedModules'),
     };
     var mergedOutputOptions;
     if (Array.isArray(config.output)) {
@@ -5915,7 +5917,7 @@ var NamespaceVariable = /** @class */ (function (_super) {
             .getExports()
             .concat(module.getReexports())
             .forEach(function (name) {
-            _this.originals[name] = module.traceExport(name);
+            _this.originals[name] = module.traceExport(name)[0];
         });
         return _this;
     }
@@ -12130,18 +12132,64 @@ var ExportNamedDeclaration = /** @class */ (function (_super) {
     ExportNamedDeclaration.prototype.initialiseNode = function () {
         this.isExportDeclaration = true;
     };
-    ExportNamedDeclaration.prototype.render = function (code, es, options) {
-        if (this.declaration) {
-            if (!options.preserveModules || !this.included) {
-                code.remove(this.start, this.declaration.start);
+    ExportNamedDeclaration.prototype.includeInBundle = function () {
+        var addedNewNodes = !this.included;
+        this.included = true;
+        this.specifiers.forEach(function (node) {
+            if (node.shouldBeIncluded()) {
+                if (node.includeInBundle()) {
+                    addedNewNodes = true;
+                }
             }
-            this.declaration.render(code, es, options);
+        });
+        if (this.declaration && this.declaration.shouldBeIncluded()) {
+            if (this.declaration.includeInBundle()) {
+                addedNewNodes = true;
+            }
+        }
+        if (this.source) {
+            if (this.source.includeInBundle()) {
+                addedNewNodes = true;
+            }
+        }
+        return addedNewNodes;
+    };
+    ExportNamedDeclaration.prototype.render = function (code, es, options) {
+        var _this = this;
+        var removeAll = function () {
+            var start = _this.leadingCommentStart || _this.start;
+            var end = _this.next || _this.end;
+            code.remove(start, end);
+        };
+        if (options.preserveModules && this.included) {
+            if (this.included) {
+                for (var i = 0; i < this.specifiers.length; i++) {
+                    var specifier = this.specifiers[i];
+                    specifier.render(code, es, options);
+                    if (!specifier.included) {
+                        if (i === this.specifiers.length - 1) {
+                            code.remove(this.specifiers[i - 1].end, specifier.start);
+                        }
+                        else {
+                            code.remove(specifier.end, this.specifiers[i + 1].start);
+                        }
+                    }
+                }
+                if (this.declaration) {
+                    this.declaration.render(code, es, options);
+                }
+            }
+            else {
+                removeAll();
+            }
         }
         else {
-            var start = this.leadingCommentStart || this.start;
-            var end = this.next || this.end;
-            if (!options.preserveModules || !this.included) {
-                code.remove(start, end);
+            if (this.declaration) {
+                code.remove(this.start, this.declaration.start);
+                this.declaration.render(code, es, options);
+            }
+            else {
+                removeAll();
             }
         }
     };
@@ -12217,8 +12265,8 @@ var ExternalModule = /** @class */ (function () {
             this.exportsNames = true;
         if (name === '*')
             this.exportsNamespace = true;
-        return (this.declarations[name] ||
-            (this.declarations[name] = new ExternalVariable(this, name)));
+        return [(this.declarations[name] ||
+                (this.declarations[name] = new ExternalVariable(this, name)))];
     };
     return ExternalModule;
 }());
@@ -12779,6 +12827,19 @@ var ExportDefaultDeclaration = /** @class */ (function (_super) {
         _super.prototype.render.call(this, code, es, options);
     };
     return ExportDefaultDeclaration;
+}(NodeBase));
+
+var ExportSpecifier = /** @class */ (function (_super) {
+    __extends(ExportSpecifier, _super);
+    function ExportSpecifier() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    ExportSpecifier.prototype.render = function (code, _es, _options) {
+        if (!this.included) {
+            code.remove(this.start, this.end);
+        }
+    };
+    return ExportSpecifier;
 }(NodeBase));
 
 var ExpressionStatement = /** @class */ (function (_super) {
@@ -13422,14 +13483,14 @@ function createSpecifierString(imported, local) {
         return imported;
     }
 }
-function createSources(externalModule, node) {
+function createSources(otherModule, node) {
     function resolveId(value) {
         return node.module.resolvedIds[value] || node.module.resolvedExternalIds[value];
     }
     var sources = blank();
-    if (externalModule.isExternal && !node) {
-        keys(externalModule.declarations).forEach(function (key) {
-            var declaration = externalModule.declarations[key];
+    if (otherModule.isExternal && !node) {
+        keys(otherModule.declarations).forEach(function (key) {
+            var declaration = otherModule.declarations[key];
             // if (!node && !module.imports[key]) {
             // 	return;
             // }
@@ -13445,7 +13506,7 @@ function createSources(externalModule, node) {
     if (node) {
         var module = node.module;
         var namespacedVariables = values(module.scope.namespacedVariables).filter(function (variable) {
-            return (variable instanceof NamespaceVariable || variable instanceof ExternalVariable) && variable.module === externalModule;
+            return (variable instanceof NamespaceVariable || variable instanceof ExternalVariable) && variable.module === otherModule;
         });
         namespacedVariables.forEach(function (variable) {
             sources[variable.name] = {
@@ -13494,29 +13555,29 @@ function createSources(externalModule, node) {
     }
     return sources;
 }
-function createExternalImportString(externalModule, _a) {
+function createImportString(otherModule, _a) {
     var getPath = _a.getPath, node = _a.node;
-    var sources = createSources(externalModule, node);
+    var sources = createSources(otherModule, node);
     var specifiers = [];
     var specifiersList = [specifiers];
     var importedNames = keys(sources)
         .filter(function (name) { return name !== '*' && name !== 'default'; })
         .filter(function (name) { return sources[name].included; })
         .map(function (name) {
-        if (name[0] === '*' && externalModule instanceof ExternalModule) {
-            return "* as " + externalModule.name;
+        if (name[0] === '*' && otherModule instanceof ExternalModule) {
+            return "* as " + otherModule.name;
         }
         var source = sources[name];
         return createSpecifierString(source.imported, source.local);
     })
         .filter(Boolean);
     if (sources.default) {
-        if (externalModule instanceof ExternalModule) {
+        if (otherModule instanceof ExternalModule) {
             var name = sources.default.local;
-            if (!node && externalModule.name) {
-                name = externalModule.name;
+            if (!node && otherModule.name) {
+                name = otherModule.name;
             }
-            if (externalModule.exportsNamespace && !node) {
+            if (otherModule.exportsNamespace && !node) {
                 specifiersList.push([name + "__default"]);
             }
             else {
@@ -13528,7 +13589,7 @@ function createExternalImportString(externalModule, _a) {
         }
     }
     var namespaceSpecifier = sources['*'] && sources['*'].included
-        ? "* as " + (externalModule instanceof ExternalModule ? externalModule.name : sources['*'].local) : null; // TODO prevent unnecessary namespace import, e.g form/external-imports
+        ? "* as " + (otherModule instanceof ExternalModule ? otherModule.name : sources['*'].local) : null; // TODO prevent unnecessary namespace import, e.g form/external-imports
     var namedSpecifier = importedNames.length
         ? "{ " + importedNames.sort().join(', ') + " }"
         : null;
@@ -13543,22 +13604,26 @@ function createExternalImportString(externalModule, _a) {
     else if (namespaceSpecifier) {
         specifiers.push(namespaceSpecifier);
     }
-    var id = node && typeof node.source.value === 'string' ? node.source.value : externalModule.id;
+    var id = node && typeof node.source.value === 'string' ? node.source.value : otherModule.id;
     return specifiersList
         .map(function (specifiers) {
         if (specifiers.length) {
             return "import " + specifiers.join(', ') + " from '" + getPath(id) + "';";
         }
-        return externalModule instanceof ExternalModule && externalModule.reexported ? null : "import '" + getPath(id) + "';";
+        return otherModule instanceof ExternalModule && otherModule.reexported ? null : "import '" + getPath(id) + "';";
     })
         .filter(Boolean)
         .join('\n');
+}
+function createExportSpecifierString(name, declaration) {
+    var rendered = declaration.getName(true);
+    return rendered === name ? name : rendered + " as " + name;
 }
 function es(bundle, magicString, _a) {
     var getPath = _a.getPath, intro = _a.intro, outro = _a.outro;
     var importBlock = bundle.externalModules
         .map(function (module) {
-        return createExternalImportString(module, { getPath: getPath, node: null });
+        return createImportString(module, { getPath: getPath, node: null });
     })
         .join('\n');
     if (importBlock)
@@ -13573,12 +13638,11 @@ function es(bundle, magicString, _a) {
         .getExports()
         .filter(notDefault)
         .forEach(function (name) {
-        var declaration = module.traceExport(name);
-        var rendered = declaration.getName(true);
-        exportInternalSpecifiers.push(rendered === name ? name : rendered + " as " + name);
+        var declaration = module.traceExport(name)[0];
+        exportInternalSpecifiers.push(createExportSpecifierString(name, declaration));
     });
     module.getReexports().forEach(function (name) {
-        var declaration = module.traceExport(name);
+        var declaration = module.traceExport(name)[0];
         if (isExternalVariable(declaration)) {
             if (name[0] === '*') {
                 // export * from 'external'
@@ -13594,14 +13658,13 @@ function es(bundle, magicString, _a) {
             }
             return;
         }
-        var rendered = declaration.getName(true);
-        exportInternalSpecifiers.push(rendered === name ? name : rendered + " as " + name);
+        exportInternalSpecifiers.push(createExportSpecifierString(name, declaration));
     });
     var exportBlock = [];
     if (exportInternalSpecifiers.length)
         exportBlock.push("export { " + exportInternalSpecifiers.join(', ') + " };");
     if (module.exports.default)
-        exportBlock.push("export default " + module.traceExport('default').getName(true) + ";");
+        exportBlock.push("export default " + module.traceExport('default')[0].getName(true) + ";");
     if (exportAllDeclarations.length)
         exportBlock.push(exportAllDeclarations.join('\n'));
     if (exportExternalSpecifiers.size) {
@@ -13657,7 +13720,7 @@ var ImportDeclaration = /** @class */ (function (_super) {
             if (externalName_1) {
                 var externalModule = options.bundle.externalModules.find(function (module) { return module.id === externalName_1; });
                 if (externalModule && !this.module.renderedExternalModules[externalModule.id]) {
-                    var externalImportString = createExternalImportString(externalModule, { getPath: options.getPath, node: this });
+                    var externalImportString = createImportString(externalModule, { getPath: options.getPath, node: this });
                     code.overwrite(this.start, this.end, externalImportString);
                     this.module.renderedExternalModules[externalModule.id] = externalModule;
                     return;
@@ -13668,7 +13731,7 @@ var ImportDeclaration = /** @class */ (function (_super) {
                 if (name_1) {
                     var module = this.module.graph.modules.find(function (module) { return module.id === name_1; });
                     if (!this.module.renderedModules[module.id]) {
-                        var importString = createExternalImportString(module, { getPath: options.getPath, node: this });
+                        var importString = createImportString(module, { getPath: options.getPath, node: this });
                         code.overwrite(this.start, this.end, importString);
                         this.module.renderedModules[module.id] = module;
                         return;
@@ -13920,15 +13983,15 @@ var ModuleScope = /** @class */ (function (_super) {
             var addDeclaration = function (declaration) {
                 if (isNamespaceVariable(declaration) && !isExternalVariable(declaration)) {
                     declaration.module.getExports()
-                        .forEach(function (name) { return addDeclaration(declaration.module.traceExport(name)); });
+                        .forEach(function (name) { return addDeclaration(declaration.module.traceExport(name)[0]); });
                 }
                 localNames.add(declaration.name);
             };
             specifier.module.getExports().forEach(function (name) {
-                addDeclaration(specifier.module.traceExport(name));
+                addDeclaration(specifier.module.traceExport(name)[0]);
             });
             if (specifier.name !== '*') {
-                var declaration = specifier.module.traceExport(specifier.name);
+                var declaration = specifier.module.traceExport(specifier.name)[0];
                 if (!declaration) {
                     _this.module.warn({
                         code: 'NON_EXISTENT_EXPORT',
@@ -14034,7 +14097,7 @@ var MemberExpression = /** @class */ (function (_super) {
         if (!isNamespaceVariable(baseVariable))
             return null;
         var exportName = path$$1[0].key;
-        var variable = baseVariable.module.traceExport(exportName);
+        var variable = baseVariable.module.traceExport(exportName)[0];
         if (!variable) {
             this.module.warn({
                 code: 'MISSING_EXPORT',
@@ -14744,6 +14807,7 @@ var nodes = {
     ExportAllDeclaration: ExportAllDeclaration,
     ExportDefaultDeclaration: ExportDefaultDeclaration,
     ExportNamedDeclaration: ExportNamedDeclaration,
+    ExportSpecifier: ExportSpecifier,
     ExpressionStatement: ExpressionStatement,
     ForStatement: ForStatement,
     ForInStatement: ForInStatement,
@@ -17775,7 +17839,7 @@ var Module = /** @class */ (function () {
             if (importDeclaration.name === '*' && !otherModule.isExternal) {
                 return otherModule.namespace();
             }
-            var declaration = otherModule.traceExport(importDeclaration.name);
+            var declaration = otherModule.traceExport(importDeclaration.name)[0];
             if (!declaration) {
                 var log = this.graph.includeMissingExports ? this.warn : this.error;
                 log.call(this, {
@@ -17800,8 +17864,8 @@ var Module = /** @class */ (function () {
         // export { foo } from './other'
         var reexportDeclaration = this.reexports[name];
         if (reexportDeclaration) {
-            var declaration = reexportDeclaration.module.traceExport(reexportDeclaration.localName);
-            if (!declaration) {
+            var declarations_1 = reexportDeclaration.module.traceExport(reexportDeclaration.localName);
+            if (!declarations_1.length) {
                 var log = this.graph.includeMissingExports ? this.warn : this.error;
                 log.call(this, {
                     code: 'MISSING_EXPORT',
@@ -17812,22 +17876,31 @@ var Module = /** @class */ (function () {
                     reexportDeclaration.module.wasOptedInToIncludeAll = true;
                 }
             }
-            return declaration;
+            return declarations_1;
         }
+        var declarations = [];
         var exportDeclaration = this.exports[name];
         if (exportDeclaration) {
             var name_1 = exportDeclaration.localName;
             var declaration = this.trace(name_1);
-            return declaration || this.graph.scope.findVariable(name_1);
+            if (!declaration) {
+                declaration = this.graph.scope.findVariable(name_1);
+            }
+            if (declaration) {
+                declarations.push(declaration);
+            }
+            return declarations;
         }
         if (name === 'default')
-            return;
+            return [];
         for (var i = 0; i < this.exportAllModules.length; i += 1) {
             var module = this.exportAllModules[i];
-            var declaration = module.traceExport(name);
-            if (declaration)
-                return declaration;
+            declarations = declarations.concat(module.traceExport(name));
+            if (!this.graph.includeNamespaceConflicts && declarations.length) {
+                break;
+            }
         }
+        return declarations;
     };
     Module.prototype.warn = function (warning, pos) {
         if (pos !== undefined) {
@@ -18041,7 +18114,7 @@ function getExportBlock(bundle, exportMode, mechanism) {
     if (mechanism === void 0) { mechanism = 'return'; }
     var entryModule = bundle.entryModule;
     if (exportMode === 'default') {
-        return mechanism + " " + entryModule.traceExport('default').getName(false) + ";";
+        return mechanism + " " + entryModule.traceExport('default')[0].getName(false) + ";";
     }
     var exports = entryModule
         .getExports()
@@ -18054,7 +18127,7 @@ function getExportBlock(bundle, exportMode, mechanism) {
             return "Object.keys(" + module.name + ").forEach(function (key) { exports[key] = " + module.name + "[key]; });";
         }
         var prop = name === 'default' ? "['default']" : "." + name;
-        var declaration = entryModule.traceExport(name);
+        var declaration = entryModule.traceExport(name)[0];
         var lhs = "exports" + prop;
         var rhs = declaration ? declaration.getName(false) : name; // exporting a global
         // prevent `exports.count = exports.count`
@@ -18779,6 +18852,9 @@ var Bundle$1 = /** @class */ (function () {
         var _this = this;
         var getPath = this.createGetPath(options);
         var promises = this.orderedModules.map(function (module) {
+            if (options.excludedModules && options.excludedModules.indexOf(module.id) > -1) {
+                return;
+            }
             var source = module.render(true, false, false, {
                 preserveModules: true,
                 bundle: _this,
@@ -18902,6 +18978,7 @@ var Graph = /** @class */ (function () {
         this.preserveSymlinks = options.preserveSymlinks;
         this.includeMissingExports = options.includeMissingExports;
         this.includeAllNamespacedInternal = options.includeAllNamespacedInternal;
+        this.includeNamespaceConflicts = options.includeNamespaceConflicts;
     }
     Graph.prototype.loadModule = function (entryName) {
         var _this = this;
@@ -19016,7 +19093,7 @@ var Graph = /** @class */ (function () {
     };
     Graph.prototype.mark = function (entryModule) {
         entryModule.getExports().forEach(function (name) {
-            var variable = entryModule.traceExport(name);
+            var variable = entryModule.traceExport(name)[0];
             var y = entryModule.exports[name];
             if (y && y.specifier) {
                 y.specifier.includeInBundle();
@@ -19028,7 +19105,7 @@ var Graph = /** @class */ (function () {
             }
         });
         entryModule.getReexports().forEach(function (name) {
-            var variable = entryModule.traceExport(name);
+            var variables = entryModule.traceExport(name);
             var y = entryModule.reexports[name];
             if (y && !y.module.isExternal) {
                 y.module.ast.body.forEach(function (node) {
@@ -19047,7 +19124,7 @@ var Graph = /** @class */ (function () {
             if (y && y.specifier) {
                 y.specifier.includeInBundle();
             }
-            if (variable) {
+            variables.forEach(function (variable) {
                 if (isExternalVariable(variable)) {
                     variable.reexported = variable.module.reexported = true;
                 }
@@ -19055,7 +19132,7 @@ var Graph = /** @class */ (function () {
                     variable.exportName = name;
                     variable.includeVariable();
                 }
-            }
+            });
         });
         entryModule.ast.body.forEach(function (node) {
             if (node.type === 'ExportAllDeclaration') {
@@ -19237,7 +19314,7 @@ var Graph = /** @class */ (function () {
                     if (exportAllModule.isExternal)
                         return;
                     keys(exportAllModule.exportsAll).forEach(function (name) {
-                        if (name in module.exportsAll) {
+                        if (!_this.includeNamespaceConflicts && name in module.exportsAll) {
                             _this.warn({
                                 code: 'NAMESPACE_CONFLICT',
                                 reexporter: module.id,
@@ -19434,7 +19511,6 @@ function rollup(rawInputOptions) {
                 imports: bundle.externalModules.map(function (module) { return module.id; }),
                 exports: keys(bundle.entryModule.exports),
                 modules: bundle.orderedModules.map(function (module) { return module.toJSON(); }),
-                bundle: bundle,
                 generate: generate,
                 generateModules: generateModules,
                 write: function (outputOptions) {
@@ -23240,6 +23316,7 @@ function mergeOptions$1(_a) {
         preserveSymlinks: config.preserveSymlinks,
         includeMissingExports: config.includeMissingExports,
         includeAllNamespacedInternal: config.includeAllNamespacedInternal,
+        includeNamespaceConflicts: config.includeNamespaceConflicts,
     };
     // legacy, to ensure e.g. commonjs plugin still works
     inputOptions.entry = inputOptions.input;
@@ -23296,6 +23373,7 @@ function mergeOptions$1(_a) {
         srcDir: getOutputOption('srcDir'),
         destDir: getOutputOption('destDir'),
         preserveModules: getOutputOption('preserveModules'),
+        excludedModules: getOutputOption('excludedModules'),
     };
     var mergedOutputOptions;
     if (Array.isArray(config.output)) {

@@ -71,6 +71,7 @@ export interface InputOptions {
 	preserveSymlinks?: boolean;
 	includeMissingExports?: boolean;
 	includeAllNamespacedInternal?: boolean;
+	includeNamespaceConflicts?: boolean;
 
 	// undocumented?
 	pureExternalModules?: boolean;
@@ -117,6 +118,7 @@ export interface OutputOptions {
 	strict?: boolean;
 	freeze?: boolean;
 	preserveModules?: boolean;
+	excludedModules?: string[];
 
 	// shared?
 	legacy?: boolean;
@@ -214,8 +216,6 @@ export interface OutputBundle {
 	imports: string[];
 	exports: string[];
 	modules: ModuleJSON[];
-
-	bundle: Bundle, // TEMPORARY ember-cli hack
 
 	generate: (outputOptions: OutputOptions) => Promise<{ code: string, map: SourceMap }>;
 	generateModules: (outputOptions: OutputOptions) => Promise<{ file: string; code: string; }[]>;
@@ -317,8 +317,6 @@ export default function rollup (rawInputOptions: GenericConfigObject) {
 					imports: bundle.externalModules.map(module => module.id),
 					exports: keys(bundle.entryModule.exports),
 					modules: bundle.orderedModules.map(module => module.toJSON()),
-
-					bundle, // TEMPORARY ember-cli hack
 
 					generate,
 					generateModules,

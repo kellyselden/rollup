@@ -5,7 +5,7 @@ import ImportDefaultSpecifier from './ImportDefaultSpecifier';
 import ImportNamespaceSpecifier from './ImportNamespaceSpecifier';
 import MagicString from 'magic-string';
 import { NodeType } from './index';
-import { createExternalImportString } from '../../finalisers/es';
+import { createImportString } from '../../finalisers/es';
 import Module from '../../Module';
 import { RenderOptions } from '../../rollup';
 
@@ -55,7 +55,7 @@ export default class ImportDeclaration extends NodeBase {
 			if (externalName) {
 				const externalModule = options.bundle.externalModules.find(module => module.id === externalName);
 				if (externalModule && !this.module.renderedExternalModules[externalModule.id]) {
-					const externalImportString = createExternalImportString( externalModule, { getPath: options.getPath, node: this } );
+					const externalImportString = createImportString( externalModule, { getPath: options.getPath, node: this } );
 					code.overwrite( this.start, this.end, externalImportString );
 					this.module.renderedExternalModules[externalModule.id] = externalModule;
 					return;
@@ -65,7 +65,7 @@ export default class ImportDeclaration extends NodeBase {
 				if (name) {
 					const module = this.module.graph.modules.find(module => module.id === name);
 					if (!this.module.renderedModules[module.id]) {
-						const importString = createExternalImportString( module, { getPath: options.getPath, node: this } );
+						const importString = createImportString( module, { getPath: options.getPath, node: this } );
 						code.overwrite( this.start, this.end, importString );
 						this.module.renderedModules[module.id] = module;
 						return;

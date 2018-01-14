@@ -685,7 +685,7 @@ export default class Module {
 				return (<Module>otherModule).namespace();
 			}
 
-			const declaration = otherModule.traceExport(importDeclaration.name);
+			const [declaration] = otherModule.traceExport(importDeclaration.name);
 
 			if (!declaration) {
 				const log = this.graph.includeMissingExports ? this.warn : this.error;
@@ -712,7 +712,7 @@ export default class Module {
 		return null;
 	}
 
-	traceExport (name: string): Variable {
+	traceExport (name: string): Variable[] {
 		// export * from 'external'
 		if (name[0] === '*') {
 			const module = this.graph.moduleById.get(name.slice(1));
@@ -722,11 +722,11 @@ export default class Module {
 		// export { foo } from './other'
 		const reexportDeclaration = this.reexports[name];
 		if (reexportDeclaration) {
-			const declaration = reexportDeclaration.module.traceExport(
+			const declarations = reexportDeclaration.module.traceExport(
 				reexportDeclaration.localName
 			);
 
-			if (!declaration) {
+			if (!declarations.length) {
 				const log = this.graph.includeMissingExports ? this.warn : this.error;
 				log.call(
 					this,
@@ -745,25 +745,38 @@ export default class Module {
 				}
 			}
 
-			return declaration;
+			return declarations;
 		}
+
+		let declarations: Variable[] = [];
 
 		const exportDeclaration = this.exports[name];
 		if (exportDeclaration) {
 			const name = exportDeclaration.localName;
-			const declaration = this.trace(name);
+			let declaration = this.trace(name);
 
-			return declaration || this.graph.scope.findVariable(name);
+			if (!declaration) {
+				declaration = this.graph.scope.findVariable(name);
+			}
+
+			if (declaration) {
+				declarations.push(declaration);
+			}
+
+			return declarations;
 		}
 
-		if (name === 'default') return;
+		if (name === 'default') return [];
 
 		for (let i = 0; i < this.exportAllModules.length; i += 1) {
 			const module = this.exportAllModules[i];
-			const declaration = module.traceExport(name);
-
-			if (declaration) return declaration;
+			declarations = declarations.concat(module.traceExport(name));
+			if (!this.graph.includeNamespaceConflicts && declarations.length) {
+				break;
+			}
 		}
+
+		return declarations;
 	}
 
 	warn (warning: RollupWarning, pos: number) {

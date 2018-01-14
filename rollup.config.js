@@ -62,7 +62,7 @@ export default [
 			resolve(),
 			commonjs()
 		],
-		external: ['fs', 'path', 'events', 'module'],
+		external: ['fs', 'path', 'events', 'module', 'fs-extra'],
 		banner,
 		sourcemap: true,
 		output: [

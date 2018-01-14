@@ -10,6 +10,7 @@ import ImportNamedDeclaration from '../ast/nodes/ImportNamedDeclaration';
 import ImportSpecifier from '../ast/nodes/ImportSpecifier';
 import ImportDefaultSpecifier from '../ast/nodes/ImportDefaultSpecifier';
 import ImportNamespaceSpecifier from '../ast/nodes/ImportNamespaceSpecifier';
+import Variable from '../ast/variables/Variable';
 
 function notDefault (name: string) {
 	return name !== 'default';
@@ -23,15 +24,15 @@ export function createSpecifierString (imported: string, local: string) {
 	}
 }
 
-export function createSources (externalModule: Module | ExternalModule, node: ImportDeclaration) {
+export function createSources (otherModule: Module | ExternalModule, node: ImportDeclaration) {
 	function resolveId (value: string) {
 		return node.module.resolvedIds[value] || node.module.resolvedExternalIds[value];
 	}
 
 	const sources = blank();
-	if (externalModule.isExternal && !node) {
-		keys(externalModule.declarations).forEach(key => {
-			const declaration = externalModule.declarations[key];
+	if (otherModule.isExternal && !node) {
+		keys(otherModule.declarations).forEach(key => {
+			const declaration = otherModule.declarations[key];
 			// if (!node && !module.imports[key]) {
 			// 	return;
 			// }
@@ -49,7 +50,7 @@ export function createSources (externalModule: Module | ExternalModule, node: Im
 		const { module } = node;
 
 		const namespacedVariables = values(module.scope.namespacedVariables).filter(variable => {
-			return (variable instanceof NamespaceVariable || variable instanceof ExternalVariable) && variable.module === externalModule;
+			return (variable instanceof NamespaceVariable || variable instanceof ExternalVariable) && variable.module === otherModule;
 		});
 		namespacedVariables.forEach(variable => {
 			sources[variable.name] = {
@@ -98,19 +99,19 @@ export function createSources (externalModule: Module | ExternalModule, node: Im
 	return sources;
 }
 
-export function createExternalImportString (externalModule: Module | ExternalModule, { getPath, node }: {
+export function createImportString (otherModule: Module | ExternalModule, { getPath, node }: {
 	getPath: (name: string) => string;
 	node: ImportDeclaration;
 }) {
-	const sources = createSources(externalModule, node);
+	const sources = createSources(otherModule, node);
 	const specifiers: string[] = [];
 	const specifiersList = [specifiers];
 	const importedNames = keys(sources)
 		.filter(name => name !== '*' && name !== 'default')
 		.filter(name => sources[name].included)
 		.map(name => {
-			if (name[0] === '*' && externalModule instanceof ExternalModule) {
-				return `* as ${externalModule.name}`;
+			if (name[0] === '*' && otherModule instanceof ExternalModule) {
+				return `* as ${otherModule.name}`;
 			}
 
 			const source = sources[name];
@@ -120,12 +121,12 @@ export function createExternalImportString (externalModule: Module | ExternalMod
 		.filter(Boolean);
 
 	if (sources.default) {
-		if (externalModule instanceof ExternalModule) {
+		if (otherModule instanceof ExternalModule) {
 			let name = sources.default.local;
-			if (!node && externalModule.name) {
-				name = externalModule.name;
+			if (!node && otherModule.name) {
+				name = otherModule.name;
 			}
-			if (externalModule.exportsNamespace && !node) {
+			if (otherModule.exportsNamespace && !node) {
 				specifiersList.push([`${name}__default`]);
 			} else {
 				specifiers.push(name);
@@ -137,7 +138,7 @@ export function createExternalImportString (externalModule: Module | ExternalMod
 
 	const namespaceSpecifier =
 		sources['*'] && sources['*'].included
-			? `* as ${externalModule instanceof ExternalModule ? externalModule.name : sources['*'].local}` : null; // TODO prevent unnecessary namespace import, e.g form/external-imports
+			? `* as ${otherModule instanceof ExternalModule ? otherModule.name : sources['*'].local}` : null; // TODO prevent unnecessary namespace import, e.g form/external-imports
 	const namedSpecifier = importedNames.length
 		? `{ ${importedNames.sort().join(', ')} }`
 		: null;
@@ -152,7 +153,7 @@ export function createExternalImportString (externalModule: Module | ExternalMod
 		specifiers.push(namespaceSpecifier);
 	}
 
-	const id = node && typeof node.source.value === 'string' ? node.source.value : externalModule.id;
+	const id = node && typeof node.source.value === 'string' ? node.source.value : otherModule.id;
 
 	return specifiersList
 		.map(specifiers => {
@@ -162,10 +163,15 @@ export function createExternalImportString (externalModule: Module | ExternalMod
 				)}';`;
 			}
 
-			return externalModule instanceof ExternalModule && externalModule.reexported ? null : `import '${getPath(id)}';`;
+			return otherModule instanceof ExternalModule && otherModule.reexported ? null : `import '${getPath(id)}';`;
 		})
 		.filter(Boolean)
 		.join('\n');
+}
+
+function createExportSpecifierString (name: string, declaration: Variable) {
+	const rendered = declaration.getName(true);
+	return rendered === name ? name : `${rendered} as ${name}`;
 }
 
 export default function es (bundle: Bundle, magicString: MagicStringBundle, { getPath, intro, outro }: {
@@ -177,7 +183,7 @@ export default function es (bundle: Bundle, magicString: MagicStringBundle, { ge
 }) {
 	const importBlock = bundle.externalModules
 		.map(module => {
-			return createExternalImportString(module, { getPath, node: null });
+			return createImportString(module, { getPath, node: null });
 		})
 		.join('\n');
 
@@ -194,15 +200,14 @@ export default function es (bundle: Bundle, magicString: MagicStringBundle, { ge
 		.getExports()
 		.filter(notDefault)
 		.forEach(name => {
-			const declaration = module.traceExport(name);
-			const rendered = declaration.getName(true);
+			const [declaration] = module.traceExport(name);
 			exportInternalSpecifiers.push(
-				rendered === name ? name : `${rendered} as ${name}`
+				createExportSpecifierString(name, declaration)
 			);
 		});
 
 	module.getReexports().forEach(name => {
-		const declaration = module.traceExport(name);
+		const [declaration] = module.traceExport(name);
 
 		if (isExternalVariable(declaration)) {
 			if (name[0] === '*') {
@@ -220,9 +225,8 @@ export default function es (bundle: Bundle, magicString: MagicStringBundle, { ge
 			return;
 		}
 
-		const rendered = declaration.getName(true);
 		exportInternalSpecifiers.push(
-			rendered === name ? name : `${rendered} as ${name}`
+			createExportSpecifierString(name, declaration)
 		);
 	});
 
@@ -231,7 +235,7 @@ export default function es (bundle: Bundle, magicString: MagicStringBundle, { ge
 		exportBlock.push(`export { ${exportInternalSpecifiers.join(', ')} };`);
 	if (module.exports.default)
 		exportBlock.push(
-			`export default ${module.traceExport('default').getName(true)};`
+			`export default ${module.traceExport('default')[0].getName(true)};`
 		);
 	if (exportAllDeclarations.length)
 		exportBlock.push(exportAllDeclarations.join('\n'));
