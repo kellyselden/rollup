@@ -38,6 +38,7 @@ import { isTemplateLiteral } from './ast/nodes/TemplateLiteral';
 import { isLiteral } from './ast/nodes/Literal';
 import Chunk from './Chunk';
 import { RenderOptions } from './utils/renderHelpers';
+import VariableDeclaration from './ast/nodes/VariableDeclaration';
 
 export interface IdMap {
 	[key: string]: string;
@@ -322,6 +323,7 @@ export default class Module {
 				});
 			} else {
 				// export function foo () {}
+				console.log(declaration.type);
 				const localName = declaration.id.name;
 				this.exports[localName] = { localName };
 			}
@@ -699,6 +701,30 @@ export default class Module {
 
 			if (declaration) return declaration;
 		}
+
+		let id = new Identifier();
+		id.type = NodeType.Identifier;
+		id.name = name;
+		let init = new Identifier();
+		id.type = NodeType.Identifier;
+		init.name = 'undefined';
+		let declarator = new VariableDeclarator();
+		declarator.type = NodeType.VariableDeclarator;
+		declarator.id = id;
+		declarator.init = init;
+		let declaration = new VariableDeclaration();
+		declaration.type = NodeType.VariableDeclaration;
+		declaration.declarations = [declarator];
+		declaration.kind = 'var';
+		declaration.initialise(this.scope);
+		let declaration2 = new ExportNamedDeclaration();
+		declaration2.type = NodeType.ExportNamedDeclaration;
+		declaration2.declaration = declaration;
+		declaration2.specifiers = [];
+		this.ast.body.push(declaration2);
+		declaration2.bind();
+		this.addExport(declaration2);
+		return this.traceExport(name);
 	}
 
 	warn(warning: RollupWarning, pos: number) {
