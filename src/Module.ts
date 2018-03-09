@@ -649,9 +649,9 @@ export default class Module {
 
 			if (!declaration) {
 				this.graph.handleMissingExport(
-					this,
 					importDeclaration.name,
-					otherModule,
+					this,
+					otherModule.id,
 					importDeclaration.specifier.start
 				);
 			}
@@ -681,9 +681,9 @@ export default class Module {
 
 			if (!declaration) {
 				this.graph.handleMissingExport(
-					this,
 					reexportDeclaration.localName,
-					reexportDeclaration.module,
+					this,
+					reexportDeclaration.module.id,
 					reexportDeclaration.start
 				);
 			}
