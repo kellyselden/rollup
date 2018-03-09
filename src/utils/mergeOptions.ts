@@ -82,7 +82,8 @@ export default function mergeOptions({
 		experimentalDynamicImport: getInputOption('experimentalDynamicImport'),
 		experimentalCodeSplitting: getInputOption('experimentalCodeSplitting'),
 		preserveSymlinks: getInputOption('preserveSymlinks'),
-		experimentalPreserveModules: getInputOption('experimentalPreserveModules')
+		experimentalPreserveModules: getInputOption('experimentalPreserveModules'),
+		inputRelativeDir: getInputOption('inputRelativeDir')
 	};
 
 	// legacy, to ensure e.g. commonjs plugin still works

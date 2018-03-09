@@ -14,6 +14,7 @@ import { isAbsolute, isRelative, normalize, relative, resolve } from './utils/pa
 import {
 	InputOptions,
 	IsExternalHook,
+	ModuleDestHook,
 	Plugin,
 	ResolveIdHook,
 	RollupWarning,
@@ -59,7 +60,11 @@ function generateChunkName(
 	let uniqueIndex = startAtTwo ? 2 : 1;
 	while (chunkNames[uniqueName]) uniqueName = name + uniqueIndex++;
 	chunkNames[uniqueName] = true;
-	return uniqueName + ext;
+	name = uniqueName + ext;
+	if (!name.startsWith('.')) {
+		name = './' + name;
+	}
+	return name;
 }
 
 export default class Graph {
@@ -82,6 +87,7 @@ export default class Graph {
 		importerStart?: number
 	) => void;
 	moduleById: Map<string, Module | ExternalModule>;
+	moduleDest: ModuleDestHook;
 	modules: Module[];
 	onwarn: WarningHandler;
 	plugins: Plugin[];
@@ -166,6 +172,13 @@ export default class Graph {
 					};
 				})
 				.concat(handleMissingExport)
+		);
+
+		this.moduleDest = first(
+			this.plugins
+				.map(plugin => plugin.moduleDest)
+				.filter(Boolean)
+				.concat(file => Promise.resolve(file))
 		);
 
 		this.scope = new GlobalScope();
@@ -336,7 +349,8 @@ export default class Graph {
 
 	buildChunks(
 		entryModuleIds: string[],
-		preserveModules: boolean
+		preserveModules: boolean,
+		inputRelativeDir: string
 	): Promise<{ [name: string]: Chunk }> {
 		// Phase 1 – discovery. We load the entry module and find which
 		// modules it imports, and import those, until we have all
@@ -432,8 +446,7 @@ export default class Graph {
 					[name: string]: Chunk;
 				} = {};
 
-				let inputRelativeDir: string;
-				if (preserveModules) {
+				if (preserveModules && !inputRelativeDir) {
 					if (orderedModules.length === 1) {
 						inputRelativeDir = path.dirname(orderedModules[0].id);
 					} else {
@@ -457,24 +470,24 @@ export default class Graph {
 						// if the chunk exactly exports the entry point exports then
 						// it can replace the entry point
 						if (chunk.isEntryModuleFacade || preserveModules) {
-							chunks['./' + entryName] = chunk;
-							chunk.setId('./' + entryName);
+							chunks[entryName] = chunk;
+							chunk.setId(entryName);
 							return;
 							// otherwise we create a special re-exporting entry point
 							// facade chunk with no modules
 						} else {
 							const entryPointFacade = new Chunk(this, []);
-							entryPointFacade.setId('./' + entryName);
+							entryPointFacade.setId(entryName);
 							entryPointFacade.collectDependencies(chunk.entryModule);
 							entryPointFacade.generateImports();
 							entryPointFacade.generateEntryExports(chunk.entryModule);
-							chunks['./' + entryName] = entryPointFacade;
+							chunks[entryName] = entryPointFacade;
 						}
 					}
 					// name the chunk itself
 					const chunkName = generateChunkName('chunk', chunkNames);
-					chunk.setId('./' + chunkName);
-					chunks['./' + chunkName] = chunk;
+					chunk.setId(chunkName);
+					chunks[chunkName] = chunk;
 				});
 
 				timeEnd('phase 4');
