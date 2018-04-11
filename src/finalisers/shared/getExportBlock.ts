@@ -79,7 +79,12 @@ export default function getExportBlock(
 
 	exports.forEach(expt => {
 		const lhs = `exports.${expt.exported}`;
-		const rhs = expt.local;
+		let rhs;
+		if (expt.shim) {
+			rhs = 'null';
+		} else {
+			rhs = expt.local;
+		}
 		if (lhs === rhs) {
 			return;
 		}

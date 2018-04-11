@@ -92,7 +92,15 @@ export default function system(
 	// function declarations hoist
 	const functionExports: string[] = [];
 	exports.forEach(expt => {
-		if (expt.hoisted) functionExports.push(`exports('${expt.exported}', ${expt.local});`);
+		let val;
+		if (expt.shim) {
+			val = 'null';
+		} else if (expt.hoisted) {
+			val = expt.local;
+		}
+		if (val) {
+			functionExports.push(`exports('${expt.exported}', ${val});`);
+		}
 	});
 
 	const starExcludesSection = !starExcludes

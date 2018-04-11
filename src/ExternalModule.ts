@@ -99,7 +99,7 @@ export default class ExternalModule {
 		});
 	}
 
-	traceExport(name: string): Variable {
+	traceExport(name: string, _isExportAllSearch?: boolean): Variable {
 		if (name !== 'default' && name !== '*') this.exportsNames = true;
 		if (name === '*') this.exportsNamespace = true;
 

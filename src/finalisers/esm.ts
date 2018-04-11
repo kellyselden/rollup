@@ -83,6 +83,11 @@ export default function esm(
 	const exportBlock: string[] = [];
 	const exportDeclaration: string[] = [];
 	exports.forEach(specifier => {
+		if (specifier.shim) {
+			exportBlock.push(`const ${specifier.local} = null;`);
+		}
+	});
+	exports.forEach(specifier => {
 		if (specifier.exported === 'default') {
 			exportBlock.push(`export default ${specifier.local};`);
 		} else {

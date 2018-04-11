@@ -37,6 +37,7 @@ import { isLiteral } from './ast/nodes/Literal';
 import Chunk from './Chunk';
 import { RenderOptions } from './utils/renderHelpers';
 import { getOriginalLocation } from './utils/getOriginalLocation';
+import ShimVariable from './ast/variables/ShimVariable';
 
 export interface CommentDescription {
 	block: boolean;
@@ -55,6 +56,7 @@ export interface ImportDescription {
 export interface ExportDescription {
 	localName: string;
 	identifier?: string;
+	shim?: ShimVariable;
 }
 
 export interface ReexportDescription {
@@ -648,7 +650,7 @@ export default class Module {
 		return null;
 	}
 
-	traceExport(name: string): Variable {
+	traceExport(name: string, isExportAllSearch?: boolean): Variable {
 		if (name[0] === '*') {
 			// namespace
 			if (name.length === 1) {
@@ -679,19 +681,29 @@ export default class Module {
 
 		const exportDeclaration = this.exports[name];
 		if (exportDeclaration) {
+			if (exportDeclaration.shim) {
+				return exportDeclaration.shim;
+			}
+
 			const name = exportDeclaration.localName;
 			const declaration = this.traceVariable(name);
 
 			return declaration || this.graph.scope.findVariable(name);
 		}
 
-		if (name === 'default') return;
+		if (name !== 'default') {
+			for (let i = 0; i < this.exportAllModules.length; i += 1) {
+				const module = this.exportAllModules[i];
+				const declaration = module.traceExport(name, true);
 
-		for (let i = 0; i < this.exportAllModules.length; i += 1) {
-			const module = this.exportAllModules[i];
-			const declaration = module.traceExport(name);
+				if (declaration) return declaration;
+			}
+		}
 
-			if (declaration) return declaration;
+		// we don't want to create shims when we are just
+		// probing export * modules for exports
+		if (this.graph.shimMissingExports && !isExportAllSearch) {
+			return this.shimMissingExport(name);
 		}
 	}
 
@@ -707,5 +719,14 @@ export default class Module {
 
 		warning.id = this.id;
 		this.graph.warn(warning);
+	}
+
+	shimMissingExport(name: string) {
+		const shim = new ShimVariable(name === 'default' ? this.basename() : name);
+		this.exports[name] = {
+			localName: name,
+			shim
+		};
+		return shim;
 	}
 }

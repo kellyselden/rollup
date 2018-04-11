@@ -10,7 +10,9 @@ const createGetOption = (config: GenericConfigObject, command: GenericConfigObje
 ) =>
 	command[name] !== undefined
 		? command[name]
-		: config[name] !== undefined ? config[name] : defaultValue;
+		: config[name] !== undefined
+			? config[name]
+			: defaultValue;
 
 const normalizeObjectOptionValue = (optionValue: any) => {
 	if (!optionValue) {
@@ -214,6 +216,7 @@ function getInputOptions(
 		preferConst: getOption('preferConst'),
 		preserveSymlinks: getOption('preserveSymlinks'),
 		treeshake: getObjectOption(config, command, 'treeshake'),
+		shimMissingExports: getOption('shimMissingExports'),
 		watch: config.watch
 	};
 

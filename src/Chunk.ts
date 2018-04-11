@@ -22,6 +22,7 @@ import sha256 from 'hash.js/lib/hash/sha/256';
 import { jsExts } from './utils/relativeId';
 import ExternalVariable from './ast/variables/ExternalVariable';
 import { GlobalsOption, OutputOptions, RawSourceMap } from './rollup/types';
+import ShimVariable from './ast/variables/ShimVariable';
 
 export interface ModuleDeclarations {
 	exports: ChunkExports;
@@ -46,6 +47,7 @@ export type ChunkExports = {
 	local: string;
 	exported: string;
 	hoisted: boolean;
+	shim: boolean;
 }[];
 
 export interface ReexportSpecifier {
@@ -286,6 +288,18 @@ export default class Chunk {
 			const namespaceVariables =
 				(<NamespaceVariable>traced.variable).originals ||
 				(<ExternalVariable>traced.variable).module.declarations;
+
+			// originals does not know about added shim exports
+			if (traced.module instanceof Module) {
+				const exports = traced.module.exports;
+				for (const name of Object.keys(exports)) {
+					const shim = exports[name].shim;
+					if (shim) {
+						namespaceVariables[name] = shim;
+					}
+				}
+			}
+
 			for (const importName of Object.keys(namespaceVariables)) {
 				const original = namespaceVariables[importName];
 				if (original.included) {
@@ -357,7 +371,7 @@ export default class Chunk {
 		for (let i = 0; i < module.exportAllModules.length; i++) {
 			const exportAllModule = module.exportAllModules[i];
 			// we have to ensure the right export all module
-			if (exportAllModule.traceExport(name)) {
+			if (exportAllModule.traceExport(name, true)) {
 				return this.traceExport(name, exportAllModule);
 			}
 		}
@@ -697,7 +711,8 @@ export default class Chunk {
 			exports.push({
 				local: localName,
 				exported: exportName === '*' ? localName : exportName,
-				hoisted
+				hoisted,
+				shim: variable instanceof ShimVariable
 			});
 		}
 		return exports;
