@@ -1,4 +1,3 @@
-import relativeId from '../../utils/relativeId';
 import Scope from './Scope';
 import LocalVariable from '../variables/LocalVariable';
 import { UNKNOWN_EXPRESSION } from '../values';
@@ -44,15 +43,11 @@ export default class ModuleScope extends Scope {
 			if (importDescription.name !== '*') {
 				const declaration = importDescription.module.traceExport(importDescription.name);
 				if (!declaration) {
-					this.context.warn(
-						{
-							code: 'NON_EXISTENT_EXPORT',
-							name: importDescription.name,
-							source: importDescription.module.id,
-							message: `Non-existent export '${
-								importDescription.name
-							}' is imported from ${relativeId(importDescription.module.id)}`
-						},
+					this.context.handleMissingExport(
+						this.context.warn,
+						importDescription.name,
+						this.context.fileName,
+						importDescription.module.id,
 						importDescription.specifier.start
 					);
 					continue;

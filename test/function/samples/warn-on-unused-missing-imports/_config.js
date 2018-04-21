@@ -5,11 +5,12 @@ module.exports = {
 	description: 'warns on missing (but unused) imports',
 	warnings: [
 		{
-			code: 'NON_EXISTENT_EXPORT',
+			code: 'MISSING_EXPORT',
+			missing: 'b',
+			importer: 'main.js',
+			exporter: 'foo.js',
 			id: path.resolve(__dirname, 'main.js'),
-			source: path.resolve(__dirname, 'foo.js'),
-			name: 'b',
-			message: `Non-existent export 'b' is imported from foo.js`,
+			message: `'b' is not exported by foo.js`,
 			pos: 12,
 			loc: {
 				file: path.resolve(__dirname, 'main.js'),
@@ -21,7 +22,8 @@ module.exports = {
 				               ^
 				2:
 				3: assert.equal( a, 42 );
-			`
+			`,
+			url: 'https://github.com/rollup/rollup/wiki/Troubleshooting#name-is-not-exported-by-module'
 		}
 	]
 };

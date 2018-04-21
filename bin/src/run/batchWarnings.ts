@@ -192,14 +192,6 @@ const deferredHandlers: {
 		}
 	},
 
-	NON_EXISTENT_EXPORT: {
-		priority: 1,
-		fn: warnings => {
-			title(`Import of non-existent ${warnings.length > 1 ? 'exports' : 'export'}`);
-			showTruncatedWarnings(warnings);
-		}
-	},
-
 	NAMESPACE_CONFLICT: {
 		priority: 1,
 		fn: warnings => {
