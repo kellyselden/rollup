@@ -2,9 +2,9 @@ define(['exports'], function (exports) { 'use strict';
 
 	const unused = null;
 
+	var $$shim = null;
 	exports.unused = unused;
-	exports.default = null;
-	exports.t1d2f2 = null;
+	exports.$$shim = $$shim;
 
 	Object.defineProperty(exports, '__esModule', { value: true });
 

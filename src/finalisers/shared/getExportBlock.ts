@@ -1,11 +1,15 @@
 import { ChunkExports, ChunkDependencies } from '../../Chunk';
+import Graph from '../../Graph';
 
 export default function getExportBlock(
 	exports: ChunkExports,
 	dependencies: ChunkDependencies,
 	exportMode: string,
+	graph: Graph,
 	mechanism = 'return'
 ) {
+	let { varOrConst } = graph;
+
 	if (exportMode === 'default') {
 		let local;
 		exports.some(expt => {
@@ -78,13 +82,16 @@ export default function getExportBlock(
 	});
 
 	exports.forEach(expt => {
-		const lhs = `exports.${expt.exported}`;
-		let rhs;
 		if (expt.shim) {
-			rhs = 'null';
-		} else {
-			rhs = expt.local;
+			if (exportBlock) {
+				exportBlock += '\n';
+			}
+			exportBlock += `${varOrConst} ${expt.local} = null;`;
 		}
+	});
+	exports.forEach(expt => {
+		const lhs = `exports.${expt.exported}`;
+		const rhs = expt.local;
 		if (lhs === rhs) {
 			return;
 		}

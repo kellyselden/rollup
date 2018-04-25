@@ -51,7 +51,7 @@ export default function cjs(
 		intro += importBlock + '\n\n';
 	}
 
-	const exportBlock = getExportBlock(exports, dependencies, exportMode, 'module.exports =');
+	const exportBlock = getExportBlock(exports, dependencies, exportMode, graph, 'module.exports =');
 
 	magicString.prepend(intro);
 

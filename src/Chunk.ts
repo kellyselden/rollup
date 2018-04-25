@@ -47,7 +47,7 @@ export type ChunkExports = {
 	local: string;
 	exported: string;
 	hoisted: boolean;
-	shim: boolean;
+	shim?: boolean;
 }[];
 
 export interface ReexportSpecifier {
@@ -379,7 +379,12 @@ export default class Chunk {
 
 	getVariableExportName(variable: Variable) {
 		for (const exportName of Object.keys(this.exportNames)) {
-			if (this.exportNames[exportName] === variable) return exportName;
+			if (this.exportNames[exportName] === variable) {
+				if (variable instanceof ShimVariable) {
+					return '$$shim';
+				}
+				return exportName;
+			}
 		}
 	}
 
@@ -531,6 +536,9 @@ export default class Chunk {
 		for (const exportName of Object.keys(this.exportNames)) {
 			const exportVariable = this.exportNames[exportName];
 			if (exportVariable) exportVariable.exportName = exportName;
+			if (exportVariable instanceof ShimVariable) {
+				toDeshadow.add('$$shim');
+			}
 		}
 
 		Array.from(this.imports.entries()).forEach(([variable, module]) => {
@@ -694,6 +702,20 @@ export default class Chunk {
 			// skip external exports
 			if (module.chunk !== this) continue;
 
+			if (variable instanceof ShimVariable) {
+				if (!exports.find(expt => expt.shim)) {
+					const name = '$$shim';
+
+					exports.push({
+						local: name,
+						exported: name,
+						hoisted: true,
+						shim: true
+					});
+				}
+				continue;
+			}
+
 			// determine if a hoisted export (function)
 			let hoisted = false;
 			if (variable instanceof LocalVariable) {
@@ -711,8 +733,7 @@ export default class Chunk {
 			exports.push({
 				local: localName,
 				exported: exportName === '*' ? localName : exportName,
-				hoisted,
-				shim: variable instanceof ShimVariable
+				hoisted
 			});
 		}
 		return exports;

@@ -25,7 +25,7 @@ export default function system(
 	const importBindings: string[] = [];
 	let starExcludes: Set<string>;
 	const setters: string[] = [];
-	const varOrConst = graph.varOrConst;
+	const { varOrConst } = graph;
 
 	dependencies.forEach(({ imports, reexports }) => {
 		let setter: string[] = [];
@@ -92,15 +92,10 @@ export default function system(
 	// function declarations hoist
 	const functionExports: string[] = [];
 	exports.forEach(expt => {
-		let val;
-		if (expt.shim) {
-			val = 'null';
-		} else if (expt.hoisted) {
-			val = expt.local;
-		}
-		if (val) {
-			functionExports.push(`exports('${expt.exported}', ${val});`);
-		}
+		if (expt.shim) functionExports.push(`${varOrConst} ${expt.local} = null;`);
+	});
+	exports.forEach(expt => {
+		if (expt.hoisted) functionExports.push(`exports('${expt.exported}', ${expt.local});`);
 	});
 
 	const starExcludesSection = !starExcludes
