@@ -381,7 +381,7 @@ export default class Chunk {
 		for (const exportName of Object.keys(this.exportNames)) {
 			if (this.exportNames[exportName] === variable) {
 				if (variable instanceof ShimVariable) {
-					return '$$shim';
+					return variable.exportName;
 				}
 				return exportName;
 			}
@@ -533,14 +533,6 @@ export default class Chunk {
 			});
 		}
 
-		for (const exportName of Object.keys(this.exportNames)) {
-			const exportVariable = this.exportNames[exportName];
-			if (exportVariable) exportVariable.exportName = exportName;
-			if (exportVariable instanceof ShimVariable) {
-				toDeshadow.add('$$shim');
-			}
-		}
-
 		Array.from(this.imports.entries()).forEach(([variable, module]) => {
 			let safeName;
 			if (module instanceof ExternalModule) {
@@ -560,7 +552,13 @@ export default class Chunk {
 					toDeshadow.add(safeName);
 				}
 			} else if (esm) {
-				safeName = getSafeName(variable.name);
+				let name;
+				if (variable instanceof ShimVariable) {
+					name = variable.getName();
+				} else {
+					name = variable.name;
+				}
+				safeName = getSafeName(name);
 			} else {
 				safeName = `${(<Module>module).chunk.name}.${module.chunk.getVariableExportName(variable)}`;
 			}
@@ -589,6 +587,33 @@ export default class Chunk {
 					variable.setSafeName(safeName);
 				}
 			});
+
+			let shimSafeName;
+			for (const exportName of Object.keys(this.exportNames)) {
+				const exportVariable = this.exportNames[exportName];
+				if (!exportVariable) continue;
+
+				let newExportName;
+				if (exportVariable instanceof ShimVariable) {
+					if (this.exports.get(exportVariable) !== module) {
+						continue;
+					}
+					if (!shimSafeName) {
+						shimSafeName = getSafeName(exportVariable.name);
+					}
+					exportVariable.setSafeName(shimSafeName);
+
+					newExportName = shimSafeName;
+				} else {
+					if (this.graph.shimMissingExports) {
+						// so a shimmed export doesn't collide with a `foo as $$shim` export
+						used[exportName] = 1;
+					}
+
+					newExportName = exportName;
+				}
+				exportVariable.exportName = newExportName;
+			}
 
 			// deconflict reified namespaces
 			const namespace = module.getAndCreateNamespace();
@@ -702,20 +727,6 @@ export default class Chunk {
 			// skip external exports
 			if (module.chunk !== this) continue;
 
-			if (variable instanceof ShimVariable) {
-				if (!exports.find(expt => expt.shim)) {
-					const name = '$$shim';
-
-					exports.push({
-						local: name,
-						exported: name,
-						hoisted: true,
-						shim: true
-					});
-				}
-				continue;
-			}
-
 			// determine if a hoisted export (function)
 			let hoisted = false;
 			if (variable instanceof LocalVariable) {
@@ -729,6 +740,18 @@ export default class Chunk {
 			}
 
 			const localName = variable.getName();
+
+			if (variable instanceof ShimVariable) {
+				if (!exports.find(expt => expt.shim)) {
+					exports.push({
+						local: localName,
+						exported: localName,
+						hoisted: true,
+						shim: true
+					});
+				}
+				continue;
+			}
 
 			exports.push({
 				local: localName,

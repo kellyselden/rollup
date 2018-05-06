@@ -1,41 +1,39 @@
 System.register(['./t1d1.js', './t1d2.js', './t2d1.js', './t3d1.js', './t3d2.js'], function (exports, module) {
 	'use strict';
-	var t1d1, t1d1f2, t1d2, t1d2f2, t3d1, unused, f2, t3d2, unused$1, f2$1;
+	var $$shim$2, $$shim$2$1, $$shim$2$2, $$shim, $$shim$2$3, $$shim$1;
 	return {
 		setters: [function (module) {
-			t1d1 = module.$$shim;
-			t1d1f2 = module.$$shim;
+			$$shim$2 = module.$$shim$2;
 		}, function (module) {
-			t1d2 = module.$$shim;
-			t1d2f2 = module.$$shim;
+			$$shim$2$1 = module.$$shim$2;
 		}, function (module) {
 			var _setter = {};
-			_setter.default = module.$$shim;
-			_setter.t2d1f1 = module.$$shim;
-			_setter.t2d1f2 = module.$$shim;
+			_setter.default = module.$$shim$2;
+			_setter.t2d1f1 = module.$$shim$2;
+			_setter.t2d1f2 = module.$$shim$2;
 			exports(_setter);
 		}, function (module) {
-			t3d1 = module.$$shim;
-			unused = module.unused;
-			f2 = module.$$shim;
+			$$shim$2$2 = module.$$shim$2;
+			$$shim = module.$$shim;
 		}, function (module) {
-			t3d2 = module.$$shim;
-			unused$1 = module.unused;
-			f2$1 = module.$$shim;
+			$$shim$2$3 = module.$$shim$2;
+			$$shim$1 = module.$$shim;
 		}],
 		execute: function () {
 
-			t1d1();
-			t1d1f2();
+			$$shim$2();
+			$$shim$2();
 
-			t1d2();
-			t1d2f2();
+			$$shim$2$1();
+			$$shim$2$1();
 
-			t3d1();
-			f2();
+			$$shim$2$2();
+			$$shim$2$2();
 
-			t3d2();
-			f2$1();
+			$$shim$2$3();
+			$$shim$2$3();
+
+			const $$shim$2$4 = exports('$$shim$2', null);
 
 		}
 	};

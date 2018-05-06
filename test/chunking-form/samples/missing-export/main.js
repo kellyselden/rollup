@@ -19,3 +19,5 @@ import t3d2f1, * as t3d2 from './t3d2';
 
 t3d2f1();
 t3d2.f2();
+
+export const $$shim$2 = null;

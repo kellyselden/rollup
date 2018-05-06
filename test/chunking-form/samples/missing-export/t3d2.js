@@ -1,1 +1,2 @@
-export const $$shim = null;
+const $$shim = null;
+export { $$shim, $$shim as $$shim$1 };

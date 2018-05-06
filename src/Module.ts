@@ -722,7 +722,13 @@ export default class Module {
 	}
 
 	shimMissingExport(name: string) {
-		const shim = new ShimVariable(name === 'default' ? this.basename() : name);
+		// dedupe multiple broken exports per module
+		let shim = Object.keys(this.exports)
+			.map(name => this.exports[name].shim)
+			.filter(Boolean)[0];
+		if (!shim) {
+			shim = new ShimVariable('$$shim');
+		}
 		this.exports[name] = {
 			localName: name,
 			shim

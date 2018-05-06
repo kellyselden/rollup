@@ -1,4 +1,4 @@
-const unused = null;
+const $$shim = null;
 
-var $$shim = null;
-export { unused, $$shim };
+var $$shim$2 = null;
+export { $$shim, $$shim as $$shim$1, $$shim$2 };
