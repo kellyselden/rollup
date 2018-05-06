@@ -289,17 +289,6 @@ export default class Chunk {
 				(<NamespaceVariable>traced.variable).originals ||
 				(<ExternalVariable>traced.variable).module.declarations;
 
-			// originals does not know about added shim exports
-			if (traced.module instanceof Module) {
-				const exports = traced.module.exports;
-				for (const name of Object.keys(exports)) {
-					const shim = exports[name].shim;
-					if (shim) {
-						namespaceVariables[name] = shim;
-					}
-				}
-			}
-
 			for (const importName of Object.keys(namespaceVariables)) {
 				const original = namespaceVariables[importName];
 				if (original.included) {
