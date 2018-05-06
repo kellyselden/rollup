@@ -3,7 +3,6 @@ System.register([], function (exports, module) {
 	return {
 		execute: function () {
 
-			exports('something', something);
 			const e = 2.7182818284;
 
 			function something () {
@@ -13,6 +12,7 @@ System.register([], function (exports, module) {
 					console.error( e$$1 );
 				}
 			}
+			exports('something', something);
 
 		}
 	};

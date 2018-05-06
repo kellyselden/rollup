@@ -4,8 +4,9 @@ System.register([], function (exports, module) {
 		execute: function () {
 
 			var $$shim$2 = null;
-			exports('$$shim$2', $$shim$2);
+
 			const $$shim = exports('$$shim$1', null);
+			exports('$$shim$2', $$shim$2);
 
 		}
 	};

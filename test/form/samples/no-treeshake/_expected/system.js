@@ -8,7 +8,6 @@ System.register(['external'], function (exports, module) {
 		}],
 		execute: function () {
 
-			exports('baz', baz);
 			var foo = 'unused';
 
 			const quux = exports('strange', 1);
@@ -26,6 +25,7 @@ System.register(['external'], function (exports, module) {
 			const moreExternal = more;
 
 			var create = exports('create', Object.create), getPrototypeOf = exports('getPrototypeOf', Object.getPrototypeOf);
+			exports('baz', baz);
 
 		}
 	};

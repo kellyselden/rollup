@@ -3,9 +3,6 @@ System.register([], function (exports, module) {
   return {
     execute: function () {
 
-      exports('updateFoo', update);
-      exports('updateBar', update$1);
-      exports('updateBaz', update$2);
       function update () {
         foo += exports('foo', 10);
       }
@@ -33,6 +30,9 @@ System.register([], function (exports, module) {
       console.log(baz);
       update$2();
       console.log(baz);
+      exports('updateFoo', update);
+      exports('updateBar', update$1);
+      exports('updateBaz', update$2);
 
     }
   };

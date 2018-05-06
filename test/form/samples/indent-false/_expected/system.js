@@ -3,10 +3,10 @@ System.register([], function (exports, module) {
 return {
 execute: function () {
 
-exports('default', foo);
 function foo () {
 	console.log( 'not indented' );
 }
+exports('default', foo);
 
 }
 };

@@ -3,10 +3,10 @@ System.register([], function (exports, module) {
   return {
     execute: function () {
 
-      exports('fn', fn);
       function fn () {
         console.log('lib1 fn');
       }
+      exports('fn', fn);
 
     }
   };

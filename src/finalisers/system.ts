@@ -25,7 +25,7 @@ export default function system(
 	const importBindings: string[] = [];
 	let starExcludes: Set<string>;
 	const setters: string[] = [];
-	const { varOrConst } = graph;
+	const varOrConst = graph.varOrConst;
 
 	dependencies.forEach(({ imports, reexports }) => {
 		let setter: string[] = [];
@@ -92,9 +92,6 @@ export default function system(
 	// function declarations hoist
 	const functionExports: string[] = [];
 	exports.forEach(expt => {
-		if (expt.shim) functionExports.push(`${varOrConst} ${expt.local} = null;`);
-	});
-	exports.forEach(expt => {
 		if (expt.hoisted) functionExports.push(`exports('${expt.exported}', ${expt.local});`);
 	});
 
@@ -117,9 +114,13 @@ ${t}return {${
 					.join(', ')}],`
 			: ''
 	}
-${t}${t}execute: function () {
+${t}${t}execute: function () {\n\n`;
 
-${functionExports.length ? `${t}${t}${t}` + functionExports.join(`\n${t}${t}${t}`) + '\n' : ''}`;
+	const wrapperEnd = `
+${functionExports.length ? `${t}${t}${t}` + functionExports.join(`\n${t}${t}${t}`) + '\n' : ''}
+${t}${t}}
+${t}};
+});`;
 
 	if (intro) magicString.prepend(intro);
 
@@ -127,6 +128,6 @@ ${functionExports.length ? `${t}${t}${t}` + functionExports.join(`\n${t}${t}${t}
 
 	return magicString
 		.indent(`${t}${t}${t}`)
-		.append(`\n\n${t}${t}}\n${t}};\n});`)
+		.append(wrapperEnd)
 		.prepend(wrapperStart);
 }

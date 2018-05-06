@@ -3,7 +3,6 @@ System.register([], function (exports, module) {
   return {
     execute: function () {
 
-      exports('b', log);
       var dep = exports('a', { x: 42 })
 
       function log (x) {
@@ -11,6 +10,7 @@ System.register([], function (exports, module) {
           console.log(x);
         }
       }
+      exports('b', log);
 
     }
   };

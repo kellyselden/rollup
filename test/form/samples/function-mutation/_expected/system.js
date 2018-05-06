@@ -3,7 +3,6 @@ System.register([], function (exports, module) {
 	return {
 		execute: function () {
 
-			exports('a', a);
 			function foo () {
 				console.log( 'foo' );
 			}
@@ -42,6 +41,7 @@ System.register([], function (exports, module) {
 				}
 			});
 			i.foo = foo;
+			exports('a', a);
 
 		}
 	};

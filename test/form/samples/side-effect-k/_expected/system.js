@@ -3,7 +3,6 @@ System.register([], function (exports, module) {
 	return {
 		execute: function () {
 
-			exports('default', x);
 			function augment ( x ) {
 				var prop, source;
 
@@ -26,6 +25,7 @@ System.register([], function (exports, module) {
 
 			function x () {}
 			augment( x.prototype );
+			exports('default', x);
 
 		}
 	};

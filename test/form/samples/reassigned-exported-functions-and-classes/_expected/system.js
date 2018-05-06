@@ -3,9 +3,6 @@ System.register([], function (exports, module) {
 	return {
 		execute: function () {
 
-			exports('foo', foo);
-			exports('bar', bar);
-			exports('baz', baz);
 			function foo () {}
 			foo = exports('foo', 1);
 
@@ -17,6 +14,9 @@ System.register([], function (exports, module) {
 
 			class quux {} exports('quux', quux);
 			quux = exports('quux', 1);
+			exports('foo', foo);
+			exports('bar', bar);
+			exports('baz', baz);
 
 		}
 	};

@@ -7,10 +7,10 @@ System.register(['./chunk-abdba260.js'], function (exports, module) {
     }],
     execute: function () {
 
-      exports('mult', mult);
       function mult (num) {
         return num + multiplier;
       }
+      exports('mult', mult);
 
     }
   };

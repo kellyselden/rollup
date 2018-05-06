@@ -862,6 +862,21 @@ export default class Chunk {
 			external.setRenderPath(options, this.entryModule && this.entryModule.id);
 		}
 
+		const shim = Object.keys(this.exportNames)
+			.map(exportName => {
+				return this.exportNames[exportName];
+			})
+			.find(variable => {
+				return variable instanceof ShimVariable;
+			});
+		if (shim) {
+			const originModule = <Module>this.exports.get(shim);
+			// only add the shim to the original source of the variable
+			if (this.orderedModules.indexOf(originModule) !== -1) {
+				hoistedSource += `\n${this.graph.varOrConst} ${shim.getName()} = null;`;
+			}
+		}
+
 		if (hoistedSource) magicString.prepend(hoistedSource + '\n\n');
 
 		this.renderedSource = magicString.trim();

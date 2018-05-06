@@ -3,10 +3,8 @@ import { FinaliserOptions } from './index';
 
 export default function esm(
 	magicString: MagicStringBundle,
-	{ intro, outro, dependencies, exports, graph }: FinaliserOptions
+	{ intro, outro, dependencies, exports }: FinaliserOptions
 ) {
-	const { varOrConst } = graph;
-
 	const importBlock = dependencies
 		.map(({ id, reexports, imports, name }) => {
 			if (!reexports && !imports) {
@@ -84,11 +82,6 @@ export default function esm(
 
 	const exportBlock: string[] = [];
 	const exportDeclaration: string[] = [];
-	exports.forEach(specifier => {
-		if (specifier.shim) {
-			exportBlock.push(`${varOrConst} ${specifier.local} = null;`);
-		}
-	});
 	exports.forEach(specifier => {
 		if (specifier.exported === 'default') {
 			exportBlock.push(`export default ${specifier.local};`);

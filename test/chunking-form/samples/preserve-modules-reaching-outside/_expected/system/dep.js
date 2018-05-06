@@ -3,10 +3,10 @@ System.register([], function (exports, module) {
   return {
     execute: function () {
 
-      exports('fn', fn);
       function fn () {
         console.log('dep fn');
       }
+      exports('fn', fn);
 
     }
   };

@@ -3,7 +3,6 @@ System.register([], function (exports, module) {
 	return {
 		execute: function () {
 
-			exports('doThings', doThings);
 			function doThings() {
 				console.log( 'doing things...' );
 			}
@@ -11,6 +10,7 @@ System.register([], function (exports, module) {
 			const number = exports('number', 42);
 
 			var setting = exports('setting', 'no');
+			exports('doThings', doThings);
 
 		}
 	};

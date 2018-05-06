@@ -51,7 +51,7 @@ export default function amd(
 
 	if (intro) magicString.prepend(intro);
 
-	const exportBlock = getExportBlock(exports, dependencies, exportMode, graph);
+	const exportBlock = getExportBlock(exports, dependencies, exportMode);
 	if (exportBlock) magicString.append('\n\n' + exportBlock);
 	if (exportMode === 'named' && options.legacy !== true && isEntryModuleFacade)
 		magicString.append(`\n\n${esModuleExport}`);

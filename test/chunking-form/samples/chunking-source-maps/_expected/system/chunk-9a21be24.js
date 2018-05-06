@@ -3,7 +3,6 @@ System.register([], function (exports, module) {
   return {
     execute: function () {
 
-      exports('a', fn$1);
       function fn () {
         console.log('lib2 fn');
       }
@@ -12,6 +11,7 @@ System.register([], function (exports, module) {
         fn();
         console.log('dep2 fn');
       }
+      exports('a', fn$1);
 
     }
   };

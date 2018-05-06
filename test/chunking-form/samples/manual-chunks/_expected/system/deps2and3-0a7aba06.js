@@ -7,8 +7,6 @@ System.register(['./lib1-f3edc83a.js'], function (exports, module) {
     }],
     execute: function () {
 
-      exports('a', fn$2);
-      exports('b', fn$3);
       function fn$1 () {
         console.log('lib2 fn');
       }
@@ -22,6 +20,8 @@ System.register(['./lib1-f3edc83a.js'], function (exports, module) {
         fn();
         console.log('dep3 fn');
       }
+      exports('a', fn$2);
+      exports('b', fn$3);
 
     }
   };
