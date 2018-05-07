@@ -215,6 +215,7 @@ function getInputOptions(
 		preferConst: getOption('preferConst'),
 		preserveSymlinks: getOption('preserveSymlinks'),
 		treeshake: getObjectOption(config, command, 'treeshake'),
+		shimMissingExports: getOption('shimMissingExports'),
 		watch: config.watch
 	};
 

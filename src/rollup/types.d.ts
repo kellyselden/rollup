@@ -203,6 +203,7 @@ export interface InputOptions {
 	experimentalPreserveModules?: boolean;
 	optimizeChunks?: boolean;
 	chunkGroupingSize?: number;
+	shimMissingExports?: boolean;
 
 	// undocumented?
 	pureExternalModules?: boolean;
