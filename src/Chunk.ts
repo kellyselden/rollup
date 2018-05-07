@@ -22,6 +22,7 @@ import { jsExts } from './utils/relativeId';
 import ExternalVariable from './ast/variables/ExternalVariable';
 import { GlobalsOption, OutputOptions, RawSourceMap } from './rollup/types';
 import { toBase64 } from './utils/base64';
+import ShimVariable from './ast/variables/ShimVariable';
 
 export interface ModuleDeclarations {
 	exports: ChunkExports;
@@ -47,6 +48,7 @@ export type ChunkExports = {
 	local: string;
 	exported: string;
 	hoisted: boolean;
+	shim?: boolean;
 }[];
 
 export interface ReexportSpecifier {
@@ -274,6 +276,7 @@ export default class Chunk {
 			const namespaceVariables =
 				(<NamespaceVariable>traced.variable).originals ||
 				(<ExternalVariable>traced.variable).module.declarations;
+
 			for (const importName of Object.keys(namespaceVariables)) {
 				const original = namespaceVariables[importName];
 				if (original.included) {
@@ -346,7 +349,7 @@ export default class Chunk {
 		for (let i = 0; i < module.exportAllModules.length; i++) {
 			const exportAllModule = module.exportAllModules[i];
 			// we have to ensure the right export all module
-			if (exportAllModule.traceExport(name)) {
+			if (exportAllModule.traceExport(name, true)) {
 				return this.traceExport(name, exportAllModule);
 			}
 		}
@@ -354,7 +357,12 @@ export default class Chunk {
 
 	getVariableExportName(variable: Variable) {
 		for (const exportName of Object.keys(this.exportNames)) {
-			if (this.exportNames[exportName] === variable) return exportName;
+			if (this.exportNames[exportName] === variable) {
+				if (variable instanceof ShimVariable) {
+					return variable.exportName;
+				}
+				return exportName;
+			}
 		}
 	}
 
@@ -474,11 +482,6 @@ export default class Chunk {
 			});
 		}
 
-		for (const exportName of Object.keys(this.exportNames)) {
-			const exportVariable = this.exportNames[exportName];
-			if (exportVariable) exportVariable.exportName = exportName;
-		}
-
 		Array.from(this.imports.entries()).forEach(([variable, module]) => {
 			let safeName;
 			if (module instanceof ExternalModule) {
@@ -501,7 +504,13 @@ export default class Chunk {
 					toDeshadow.add(safeName);
 				}
 			} else if (esm) {
-				safeName = getSafeName(variable.name);
+				let name;
+				if (variable instanceof ShimVariable) {
+					name = variable.getName();
+				} else {
+					name = variable.name;
+				}
+				safeName = getSafeName(name);
 				toDeshadow.add(safeName);
 			} else {
 				const chunk = (<Module>module).chunk;
@@ -533,6 +542,33 @@ export default class Chunk {
 					variable.setSafeName(safeName);
 				}
 			});
+
+			let shimSafeName;
+			for (const exportName of Object.keys(this.exportNames)) {
+				const exportVariable = this.exportNames[exportName];
+				if (!exportVariable) continue;
+
+				let newExportName;
+				if (exportVariable instanceof ShimVariable) {
+					if (this.exports.get(exportVariable) !== module) {
+						continue;
+					}
+					if (!shimSafeName) {
+						shimSafeName = getSafeName(exportVariable.name);
+					}
+					exportVariable.setSafeName(shimSafeName);
+
+					newExportName = shimSafeName;
+				} else {
+					if (this.graph.shimMissingExports) {
+						// so a shimmed export doesn't collide with a `foo as $$shim` export
+						used[exportName] = 1;
+					}
+
+					newExportName = exportName;
+				}
+				exportVariable.exportName = newExportName;
+			}
 
 			// deconflict reified namespaces
 			const namespace = module.getOrCreateNamespace();
@@ -662,6 +698,18 @@ export default class Chunk {
 
 			const localName = variable.getName();
 
+			if (variable instanceof ShimVariable) {
+				if (!exports.find(expt => expt.shim)) {
+					exports.push({
+						local: localName,
+						exported: localName,
+						hoisted: false,
+						shim: true
+					});
+				}
+				continue;
+			}
+
 			exports.push({
 				local: localName,
 				exported: exportName === '*' ? localName : exportName,
@@ -785,6 +833,21 @@ export default class Chunk {
 					if (namespace.renderFirst()) hoistedSource += '\n' + rendered;
 					else magicString.addSource(new MagicString(rendered));
 				}
+			}
+		}
+
+		const shim = Object.keys(this.exportNames)
+			.map(exportName => {
+				return this.exportNames[exportName];
+			})
+			.find(variable => {
+				return variable instanceof ShimVariable;
+			});
+		if (shim) {
+			const originModule = <Module>this.exports.get(shim);
+			// only add the shim to the original source of the variable
+			if (this.orderedModules.indexOf(originModule) !== -1) {
+				hoistedSource += `\n${this.graph.varOrConst} ${shim.getName()} = null;`;
 			}
 		}
 

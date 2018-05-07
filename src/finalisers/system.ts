@@ -89,10 +89,15 @@ export default function system(
 		setters.push(setter.join(`\n${t}${t}${t}`));
 	});
 
-	// function declarations hoist
 	const functionExports: string[] = [];
+	const shimExports: string[] = [];
 	exports.forEach(expt => {
-		if (expt.hoisted) functionExports.push(`exports('${expt.exported}', ${expt.local});`);
+		const exportString = `exports('${expt.exported}', ${expt.local});`;
+
+		// function declarations hoist
+		if (expt.hoisted) functionExports.push(exportString);
+
+		if (expt.shim) shimExports.push(exportString);
 	});
 
 	const starExcludesSection = !starExcludes
@@ -118,12 +123,18 @@ ${t}${t}execute: function () {
 
 ${functionExports.length ? `${t}${t}${t}` + functionExports.join(`\n${t}${t}${t}`) + '\n' : ''}`;
 
+	const wrapperEnd = `
+${shimExports.length ? `${t}${t}${t}` + shimExports.join(`\n${t}${t}${t}`) + '\n' : ''}
+${t}${t}}
+${t}};
+});`;
+
 	if (intro) magicString.prepend(intro);
 
 	if (outro) magicString.append(outro);
 
 	return magicString
 		.indent(`${t}${t}${t}`)
-		.append(`\n\n${t}${t}}\n${t}};\n});`)
+		.append(wrapperEnd)
 		.prepend(wrapperStart);
 }
