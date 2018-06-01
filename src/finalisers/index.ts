@@ -11,6 +11,7 @@ import Graph from '../Graph';
 
 export interface FinaliserOptions {
 	indentString: string;
+	getPath: (name: string) => string;
 	namedExportsMode: boolean;
 	hasExports: boolean;
 	intro: string;

@@ -12,6 +12,7 @@ export default function amd(
 		graph,
 		namedExportsMode,
 		hasExports,
+		getPath,
 		indentString,
 		intro,
 		outro,
@@ -25,7 +26,7 @@ export default function amd(
 ) {
 	warnOnBuiltins(graph, dependencies);
 
-	const deps = dependencies.map(m => `'${m.id}'`);
+	const deps = dependencies.map(m => `'${getPath(m.id)}'`);
 	const args = dependencies.map(m => m.name);
 
 	if (namedExportsMode && hasExports) {

@@ -3,23 +3,23 @@ import { FinaliserOptions } from './index';
 
 export default function esm(
 	magicString: MagicStringBundle,
-	{ intro, outro, dependencies, exports }: FinaliserOptions
+	{ getPath, intro, outro, dependencies, exports }: FinaliserOptions
 ) {
 	const importBlock = dependencies
 		.map(({ id, reexports, imports, name }) => {
 			if (!reexports && !imports) {
-				return `import '${id}';`;
+				return `import '${getPath(id)}';`;
 			}
 			let output = '';
 			if (imports) {
 				const defaultImport = imports.find(specifier => specifier.imported === 'default');
 				const starImport = imports.find(specifier => specifier.imported === '*');
 				if (starImport) {
-					output += `import * as ${starImport.local} from '${id}';`;
+					output += `import * as ${starImport.local} from '${getPath(id)}';`;
 					if (imports.length > 1) output += '\n';
 				}
 				if (defaultImport && imports.length === 1) {
-					output += `import ${defaultImport.local} from '${id}';`;
+					output += `import ${defaultImport.local} from '${getPath(id)}';`;
 				} else if (!starImport || imports.length > 1) {
 					output += `import ${defaultImport ? `${defaultImport.local}, ` : ''}{ ${imports
 						.filter(specifier => specifier !== defaultImport && specifier !== starImport)
@@ -30,7 +30,7 @@ export default function esm(
 								return `${specifier.imported} as ${specifier.local}`;
 							}
 						})
-						.join(', ')} } from '${id}';`;
+						.join(', ')} } from '${getPath(id)}';`;
 				}
 			}
 			if (reexports) {
@@ -40,7 +40,7 @@ export default function esm(
 					specifier => specifier.imported === '*' && specifier.reexported !== '*'
 				);
 				if (starExport) {
-					output += `export * from '${id}';`;
+					output += `export * from '${getPath(id)}';`;
 					if (reexports.length === 1) {
 						return output;
 					}
@@ -51,7 +51,7 @@ export default function esm(
 						!imports ||
 						!imports.some(specifier => specifier.imported === '*' && specifier.local === name)
 					)
-						output += `import * as ${name} from '${id}';\n`;
+						output += `import * as ${name} from '${getPath(id)}';\n`;
 					output += `export { ${
 						name === namespaceReexport.reexported
 							? name
@@ -71,7 +71,7 @@ export default function esm(
 							return `${specifier.imported} as ${specifier.reexported}`;
 						}
 					})
-					.join(', ')} } from '${id}';`;
+					.join(', ')} } from '${getPath(id)}';`;
 			}
 			return output;
 		})

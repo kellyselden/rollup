@@ -11,6 +11,7 @@ export default function cjs(
 		isEntryModuleFacade,
 		namedExportsMode,
 		hasExports,
+		getPath,
 		intro,
 		outro,
 		dependencies,
@@ -42,23 +43,23 @@ export default function cjs(
 				exportsDefault
 			}) => {
 				if (!reexports && !imports) {
-					return `require('${id}');`;
+					return `require('${getPath(id)}');`;
 				}
 
 				if (!interop || isChunk || !exportsDefault || !namedExportsMode) {
-					return `${varOrConst} ${name} = require('${id}');`;
+					return `${varOrConst} ${name} = require('${getPath(id)}');`;
 				}
 
 				needsInterop = true;
 
 				if (exportsNames) {
 					return (
-						`${varOrConst} ${name} = require('${id}');` +
+						`${varOrConst} ${name} = require('${getPath(id)}');` +
 						`\n${varOrConst} ${name}__default = _interopDefault(${name});`
 					);
 				}
 
-				return `${varOrConst} ${name} = _interopDefault(require('${id}'));`;
+				return `${varOrConst} ${name} = _interopDefault(require('${getPath(id)}'));`;
 			}
 		)
 		.join('\n');

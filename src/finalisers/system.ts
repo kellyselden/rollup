@@ -19,10 +19,10 @@ function getStarExcludes({ dependencies, exports }: ModuleDeclarations) {
 
 export default function system(
 	magicString: MagicStringBundle,
-	{ graph, indentString: t, intro, outro, dependencies, exports }: FinaliserOptions,
+	{ graph, getPath, indentString: t, intro, outro, dependencies, exports }: FinaliserOptions,
 	outputOptions: OutputOptions
 ) {
-	const dependencyIds = dependencies.map(m => `'${m.id}'`);
+	const dependencyIds = dependencies.map(m => `'${getPath(m.id)}'`);
 
 	const importBindings: string[] = [];
 	let starExcludes: Set<string>;

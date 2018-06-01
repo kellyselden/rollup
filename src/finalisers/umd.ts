@@ -31,6 +31,7 @@ export default function umd(
 		namedExportsMode,
 		hasExports,
 		indentString,
+		getPath,
 		intro,
 		outro,
 		dependencies,
@@ -47,8 +48,8 @@ export default function umd(
 
 	warnOnBuiltins(graph, dependencies);
 
-	const amdDeps = dependencies.map(m => `'${m.id}'`);
-	const cjsDeps = dependencies.map(m => `require('${m.id}')`);
+	const amdDeps = dependencies.map(m => `'${getPath(m.id)}'`);
+	const cjsDeps = dependencies.map(m => `require('${getPath(m.id)}')`);
 
 	const trimmed = trimEmptyImports(dependencies);
 	const globalDeps = trimmed.map(module => globalProp(module.globalName));

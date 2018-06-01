@@ -10,7 +10,16 @@ import { handleMissingExport, load, makeOnwarn, resolveId } from './utils/defaul
 import transform from './utils/transform';
 import relativeId, { nameWithoutExtension } from './utils/relativeId';
 import error from './utils/error';
-import { isRelative, resolve, basename, relative } from './utils/path';
+import {
+	isAbsolute,
+	isRelative,
+	normalize,
+	basename,
+	relative,
+	resolve,
+	dirname
+} from './utils/path';
+
 import {
 	InputOptions,
 	IsExternalHook,
@@ -198,6 +207,16 @@ export default class Graph {
 		acornPluginsToInject.push(...ensureArray(options.acornInjectPlugins));
 		this.acornParse = acornPluginsToInject.reduce((acc, plugin) => plugin(acc), acorn).parse;
 	}
+
+	// getPathRelativeToBaseDirname(resolvedId: string, parentId: string): string {
+	// 	if (isRelative(resolvedId) || isAbsolute(resolvedId)) {
+	// 		const relativeToEntry = normalize(relative(dirname(parentId), resolvedId));
+
+	// 		return isRelative(relativeToEntry) ? relativeToEntry : `./${relativeToEntry}`;
+	// 	}
+
+	// 	return resolvedId;
+	// }
 
 	getCache() {
 		return {

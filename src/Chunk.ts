@@ -1003,9 +1003,12 @@ export default class Chunk {
 				dep => dep.reexports && dep.reexports.length !== 0
 			);
 
+		const getPath = this.createGetPath(options);
+
 		const magicString = finalise(
 			this.renderedSource,
 			{
+				getPath,
 				indentString: this.indentString,
 				namedExportsMode: this.exportMode !== 'default',
 				hasExports,
@@ -1064,5 +1067,16 @@ export default class Chunk {
 				return { code, map };
 			}
 		);
+	}
+
+	private createGetPath(options: OutputOptions) {
+		const optionsPaths = options.paths;
+		const getPath =
+			typeof optionsPaths === 'function'
+				? (id: string) => optionsPaths(id, this.id) || id
+				: optionsPaths
+					? (id: string) => (optionsPaths.hasOwnProperty(id) ? optionsPaths[id] : id)
+					: (id: string) => id;
+		return getPath;
 	}
 }
