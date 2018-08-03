@@ -856,9 +856,8 @@ export default class Chunk {
 		if (hoistedSource) magicString.prepend(hoistedSource + n + n);
 
 		if (this.needsExportsShim) {
-			magicString.prepend(
-				`${n}${this.graph.varOrConst} _missingExportShim${_}=${_}void 0;${n}${n}`
-			);
+			const variable = this.graph.exportShimVariable.getName();
+			magicString.prepend(`${n}${this.graph.varOrConst} ${variable}${_}=${_}void 0;${n}${n}`);
 		}
 
 		if (options.compact) {
