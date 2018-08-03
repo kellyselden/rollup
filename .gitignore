@@ -1,7 +1,9 @@
 .DS_Store
 /node_modules
 .gobble*
-dist
+dist/*.js.map
+dist/*.d.ts
+test/typescript/dist
 _actual
 _actual.js
 coverage
