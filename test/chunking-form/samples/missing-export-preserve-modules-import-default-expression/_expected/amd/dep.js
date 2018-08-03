@@ -1,6 +1,6 @@
 define(['exports'], function (exports) { 'use strict';
 
-	var _missingExportShim = void 0;
+	var __chunk_1.undefined = void 0;
 
 	sideEffect(__chunk_1.undefined.y);
 
